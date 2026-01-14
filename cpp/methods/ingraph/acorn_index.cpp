@@ -18,12 +18,11 @@ double SecondsSince(std::chrono::steady_clock::time_point t0) {
       .count();
 }
 
-}  // namespace
+}
 
 AcornIndex::AcornIndex(int dim, const AcornParams& params,
                        std::vector<std::int32_t> attributes)
     : attributes_(attributes.begin(), attributes.end()) {
-  // ACORN's constructor copies attributes_.data() into acorn.metadata.
   index_ = std::make_unique<faiss::IndexACORNFlat>(dim, params.m, params.gamma,
                                                    attributes_, params.m_beta);
 }
@@ -35,7 +34,7 @@ AcornIndex& AcornIndex::operator=(AcornIndex&&) noexcept = default;
 AcornIndex AcornIndex::Load(const std::string& path,
                             std::vector<std::int32_t> attributes) {
   std::unique_ptr<faiss::Index> raw(faiss::read_index(path.c_str()));
-  // read_index materialises ACORN indices as IndexACORNFlat.
+
   if (dynamic_cast<faiss::IndexACORNFlat*>(raw.get()) == nullptr) {
     throw std::runtime_error("not an ACORN index: " + path);
   }
@@ -104,7 +103,7 @@ void AcornIndex::SearchBatch(std::size_t nq, const float* queries,
                              std::size_t k, const char* filter_map,
                              std::int64_t* ids, float* distances) const {
   static_assert(sizeof(faiss::idx_t) == sizeof(std::int64_t));
-  // ACORN's signature takes a non-const char*; it only reads the map.
+
   index_->search(static_cast<faiss::idx_t>(nq), queries,
                  static_cast<faiss::idx_t>(k), distances,
                  reinterpret_cast<faiss::idx_t*>(ids),
@@ -158,7 +157,6 @@ std::vector<std::size_t> AcornIndex::NodesPerLevel() const {
   const faiss::ACORN& a = index_->acorn;
   std::vector<std::size_t> out(static_cast<std::size_t>(a.max_level) + 1, 0);
   for (const int lv : a.levels) {
-    // levels[i] = 1 + highest level of node i.
     for (int level = 0; level < lv && level <= a.max_level; ++level) {
       ++out[static_cast<std::size_t>(level)];
     }
@@ -175,4 +173,4 @@ std::size_t AcornIndex::MemoryBytes() const {
          a.levels.size() * sizeof(a.levels[0]);
 }
 
-}  // namespace fse
+}

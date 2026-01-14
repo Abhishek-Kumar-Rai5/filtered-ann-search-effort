@@ -1,8 +1,3 @@
-// Post-filter (over-fetch) baseline: fetch schedule, exact agreement with
-// brute-force filtered ground truth at an exhaustive budget, filter
-// correctness, recall, refetch rounds, exact distance accounting, and
-// thread safety.
-
 #include <gtest/gtest.h>
 #include <omp.h>
 
@@ -37,8 +32,6 @@ fse::FloatMatrix Gaussian(std::size_t rows, std::size_t dim,
   return m;
 }
 
-// A toy filtered workload: Gaussian vectors, uniform integer attributes in
-// [1, values], equality predicate; masks and exact global selectivities.
 struct Toy {
   fse::FloatMatrix base;
   fse::FloatMatrix queries;
@@ -85,14 +78,14 @@ TEST(PostfilterFetchSize, FollowsOverfetchAndGrowthScheduleWithCaps) {
   EXPECT_EQ(fse::PostfilterFetchSize(10, 0.1, p, 1, 100000), 100U);
   EXPECT_EQ(fse::PostfilterFetchSize(10, 0.1, p, 2, 100000), 200U);
   EXPECT_EQ(fse::PostfilterFetchSize(10, 0.1, p, 3, 100000), 400U);
-  EXPECT_EQ(fse::PostfilterFetchSize(10, 0.1, p, 3, 250), 250U);  // cap n
-  EXPECT_EQ(fse::PostfilterFetchSize(10, 1.0, p, 1, 1000), 10U);  // k / 1
-  EXPECT_EQ(fse::PostfilterFetchSize(10, 0.3, p, 1, 1000), 34U);  // ceil
+  EXPECT_EQ(fse::PostfilterFetchSize(10, 0.1, p, 3, 250), 250U);
+  EXPECT_EQ(fse::PostfilterFetchSize(10, 1.0, p, 1, 1000), 10U);
+  EXPECT_EQ(fse::PostfilterFetchSize(10, 0.3, p, 1, 1000), 34U);
   const fse::PostfilterParams half{.ef_search = 10,
                                    .overfetch_factor = 0.5,
                                    .growth_factor = 2.0,
                                    .max_rounds = 1};
-  EXPECT_EQ(fse::PostfilterFetchSize(10, 1.0, half, 1, 1000), 10U);  // >= k
+  EXPECT_EQ(fse::PostfilterFetchSize(10, 1.0, half, 1, 1000), 10U);
   EXPECT_THROW(fse::PostfilterFetchSize(10, 0.0, p, 1, 1000),
                std::invalid_argument);
   EXPECT_THROW(fse::PostfilterFetchSize(10, 0.5, p, 0, 1000),
@@ -100,8 +93,6 @@ TEST(PostfilterFetchSize, FollowsOverfetchAndGrowthScheduleWithCaps) {
 }
 
 TEST(Postfilter, ExhaustiveBudgetMatchesBruteForceFilteredGroundTruth) {
-  // ef >= N and a fetch of the whole index: HNSW visits every reachable node,
-  // so post-filtering must return exactly the brute-force filtered top-k.
   const Toy t = MakeToy(2000, 60, 5, 100);
   fse::HnswIndex index = Build(t.base);
   const fse::PostfilterParams p{.ef_search = 2000,
@@ -182,7 +173,7 @@ TEST(Postfilter, RecallAgainstFilteredGroundTruthRisesWithBudget) {
 TEST(Postfilter, DistanceCountEqualsSumOfReplayedRounds) {
   const Toy t = MakeToy(4000, 50, 20, 400);
   fse::HnswIndex index = Build(t.base);
-  // Under-estimated selectivity (s = 1) forces refetch rounds.
+
   const fse::PostfilterParams p{.ef_search = 20,
                                 .overfetch_factor = 1.0,
                                 .growth_factor = 2.0,
@@ -207,7 +198,7 @@ TEST(Postfilter, DistanceCountEqualsSumOfReplayedRounds) {
     EXPECT_LE(r.filter_checks, fetched);
     max_rounds_seen = std::max(max_rounds_seen, r.rounds);
   }
-  EXPECT_GT(max_rounds_seen, 1U);  // the refetch path was exercised
+  EXPECT_GT(max_rounds_seen, 1U);
 }
 
 TEST(Postfilter, RefetchRecoversSurvivorsThatOneRoundMisses) {
@@ -224,7 +215,6 @@ TEST(Postfilter, RefetchRecoversSurvivorsThatOneRoundMisses) {
   index.SetEf(20);
   std::size_t partial = 0;
   for (std::size_t q = 0; q < t.queries.rows; ++q) {
-    // s = 1 under-fetches (10 candidates for a ~5 % filter).
     const auto a = fse::PostfilterSearch(index, t.queries.Row(q), kK,
                                          t.masks[q].data(), 1.0, one);
     const auto b = fse::PostfilterSearch(index, t.queries.Row(q), kK,
@@ -235,7 +225,7 @@ TEST(Postfilter, RefetchRecoversSurvivorsThatOneRoundMisses) {
     };
     EXPECT_EQ(a.rounds, 1U);
     partial += valid(a.ids) < static_cast<std::ptrdiff_t>(kK) ? 1 : 0;
-    // A single round keeps its partial survivors (padded with -1).
+
     for (std::size_t j = 0; j < kK; ++j) {
       if (a.ids[j] >= 0) {
         EXPECT_NE(t.masks[q][a.ids[j]], 0);
@@ -247,7 +237,7 @@ TEST(Postfilter, RefetchRecoversSurvivorsThatOneRoundMisses) {
 }
 
 TEST(Postfilter, UnfilteredQueryEqualsPlainHnswSearch) {
-  const Toy t = MakeToy(2000, 30, 1, 600);  // one attribute value: all pass
+  const Toy t = MakeToy(2000, 30, 1, 600);
   fse::HnswIndex index = Build(t.base);
   const fse::PostfilterParams p{.ef_search = 50,
                                 .overfetch_factor = 1.0,
@@ -288,11 +278,11 @@ TEST(Postfilter, EmptyFilterAndInvalidInputs) {
                std::invalid_argument);
   EXPECT_THROW(fse::PostfilterSearch(index, qv, kK, m, 1.5, p),
                std::invalid_argument);
-  index.SetEf(31);  // ef no longer matches params
+  index.SetEf(31);
   EXPECT_THROW(fse::PostfilterSearch(index, qv, kK, m, 0.5, p),
                std::invalid_argument);
   index.SetEf(30);
-  p.growth_factor = 1.0;  // refetching would repeat the identical search
+  p.growth_factor = 1.0;
   EXPECT_THROW(fse::PostfilterSearch(index, qv, kK, m, 0.5, p),
                std::invalid_argument);
   p.max_rounds = 0;
@@ -329,4 +319,4 @@ TEST(Postfilter, ConcurrentQueriesMatchSerialIncludingEffort) {
   }
 }
 
-}  // namespace
+}

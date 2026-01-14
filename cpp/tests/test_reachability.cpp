@@ -1,8 +1,3 @@
-// Structural reachability (docs/structural_design.md §3): hand-computed edge
-// rules, SCCs against naive mutual reachability, the analyzer against a naive
-// search, and soundness on real ACORN indexes (every returned id must be in
-// R_sem from the instrumented level-0 seed).
-
 #include <gtest/gtest.h>
 #include <omp.h>
 
@@ -44,7 +39,6 @@ std::set<std::int32_t> Succ(const fse::CsrGraph& g,
 using S = std::set<std::int32_t>;
 
 TEST(AcornSemantics, HandGraphRules) {
-  // 0 -> [1, 2, 3]; 1 -> [4]; 2 -> [5]; 3 -> [6, 7]; passing {0, 4, 5, 6}
   const auto g = Make({{1, 2, 3}, {4}, {5}, {6, 7}, {}, {}, {}, {}});
   const std::vector<char> mask = {1, 0, 0, 0, 1, 1, 1, 0};
   const fse::SemanticsParams graph{fse::Semantics::kGraph, 4, 1, 2};
@@ -52,23 +46,21 @@ TEST(AcornSemantics, HandGraphRules) {
   const fse::SemanticsParams semg{fse::Semantics::kSem, 4, 1, 2};
   const fse::SemanticsParams unf{fse::Semantics::kUnfiltered, 4, 1, 2};
   EXPECT_EQ(Succ(g, mask, 0, graph), S{});
-  EXPECT_EQ(Succ(g, mask, 0, sem1), (S{4, 5, 6}));  // γ = 1: every position
-  EXPECT_EQ(Succ(g, mask, 0, semg), (S{6}));        // γ > 1: only j >= Mβ = 2
+  EXPECT_EQ(Succ(g, mask, 0, sem1), (S{4, 5, 6}));
+  EXPECT_EQ(Succ(g, mask, 0, semg), (S{6}));
   EXPECT_EQ(Succ(g, mask, 0, unf), (S{1, 2, 3}));
-  // γ = 1 cap with M = 1 (stop after 2 passing): the 2-hop rule still fires
-  // for a non-passing entry after the stop of the inner scan (ACORN code).
+
   const fse::SemanticsParams cap1{fse::Semantics::kCap, 1, 1, 2};
   EXPECT_EQ(Succ(g, mask, 0, cap1), (S{4, 5, 6}));
 }
 
 TEST(AcornSemantics, CapStopsAfterTwoMPassingDirectEntries) {
-  // 0 -> [1, 2, 3, 4], all passing; M = 1 => stop once 2 are counted.
   const auto g = Make({{1, 2, 3, 4}, {}, {}, {}, {}});
   const std::vector<char> mask = {1, 1, 1, 1, 1};
   EXPECT_EQ(Succ(g, mask, 0, {fse::Semantics::kCap, 4, 1, 10}), (S{1, 2}));
   EXPECT_EQ(Succ(g, mask, 0, {fse::Semantics::kSem, 4, 1, 10}),
             (S{1, 2, 3, 4}));
-  // duplicates and self-loops are dropped
+
   const auto g2 = Make({{0, 1, 1}, {0}});
   EXPECT_EQ(Succ(g2, {1, 1}, 0, {fse::Semantics::kGraph, 4, 1, 10}), (S{1}));
 }
@@ -135,8 +127,7 @@ TEST(Reach, AnalyzerMatchesNaiveSearchForEveryRule) {
     for (const int gamma : {1, 4}) {
       const fse::SemanticsParams p{kind, gamma, 2, 3};
       fse::ReachAnalyzer ra(g, mask, p);
-      for (std::size_t seed = 0; seed < 40; ++seed) {  // incl. ineligible seeds
-        // naive: seed's successors first (seed may be ineligible)
+      for (std::size_t seed = 0; seed < 40; ++seed) {
         std::vector<char> want(g.Nodes(), 0);
         for (const std::int32_t w : Succ(g, mask, seed, p)) {
           if (kind == fse::Semantics::kUnfiltered || mask[w] != 0) {
@@ -160,9 +151,6 @@ TEST(Reach, AnalyzerMatchesNaiveSearchForEveryRule) {
   }
 }
 
-// hnswlib level-0 export: base-id indexed, labels in range, and (for an
-// in-order single-threaded build) the unfiltered graph is one SCC that
-// reaches every node, as POST's U = 0 assumption needs to be checked.
 TEST(Reach, HnswLevel0ExportIsLabelIndexedAndConnected) {
   constexpr std::size_t kN = 2000;
   std::mt19937 rng(5);
@@ -195,9 +183,6 @@ std::vector<float> Gaussian(std::size_t n, int dim, unsigned seed) {
   return v;
 }
 
-// Soundness of R_sem on real ACORN indexes: with a large budget, every id
-// the search returns is reachable from the instrumented level-0 seed under
-// R_sem, and R_graph is a subset of R_sem.
 TEST(Reach, AcornSearchResultsAreInRsemFromInstrumentedSeed) {
   constexpr int kDim = 16;
   constexpr std::size_t kN = 4000;
@@ -251,4 +236,4 @@ TEST(Reach, AcornSearchResultsAreInRsemFromInstrumentedSeed) {
 }
 #endif
 
-}  // namespace
+}

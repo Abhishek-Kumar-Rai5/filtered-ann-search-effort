@@ -24,4 +24,4 @@ BuildInfo GetBuildInfo() {
   };
 }
 
-}  // namespace fse
+}

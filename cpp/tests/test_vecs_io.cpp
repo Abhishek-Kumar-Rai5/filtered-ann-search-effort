@@ -1,5 +1,3 @@
-// .fvecs/.ivecs I/O and run-metadata helpers (ported from Project 1).
-
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -53,4 +51,4 @@ TEST(RunMetadata, HashIsStableAndJsonIsEscaped) {
   EXPECT_EQ(json, R"({"a": "x\"y\n", "b": 3, "c": true})");
 }
 
-}  // namespace
+}

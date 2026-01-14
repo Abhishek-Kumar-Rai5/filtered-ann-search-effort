@@ -1,19 +1,4 @@
-"""Final structural report from the completed runs (no new experiments).
-
-Usage:
-  .venv/bin/python python/analysis/structural_report.py
-
-Inputs (small summary/provenance files tracked in git; the per-query
-reachability dumps are optional, see T3b):
-  results/structural/pilot/decision/   decision experiment, s = 0.01:
-      U and R_graph/R_sem connectivity for C100 x5, C1000 x5, random x2
-      realizations (ACORN-1, ACORN-γ); decomposition (U, N(b), recall) on
-      realization 0 of C100 / C1000 / random.
-  results/structural/baseline/   Phase 4 PRE/POST at s = 0.01 (random;
-      clustered = C1000 r0, identical masks) decomposed with POST's
-      unfiltered-graph reachability.
-Outputs: results/structural/report/{tables,figures,report.json}.
-"""
+# Builds the final tables and figures from the small summaries kept in git.
 
 from __future__ import annotations
 
@@ -65,7 +50,6 @@ def main():
     man = {c["name"]: c for c in
            __import__("yaml").safe_load((D / "manifest.yaml").read_text())["conditions"]}
 
-    # T1: U across realizations (+ t-CI), plain-graph U, R_cap U
     t1 = []
     for (m, lvl), g in per.groupby(["method", "level"]):
         lo, hi = t_ci(g.U_sem)
@@ -78,7 +62,6 @@ def main():
     t1 = pd.DataFrame(t1)
     t1.to_csv(OUT / "tables" / "T1_U_by_method_fragmentation.csv", index=False)
 
-    # T2: connectivity of the passing set, plain graph vs R_sem
     t2 = per.groupby(["method", "level"]).agg(
         largest_scc_plain=("lscc_graph", "mean"), largest_scc_Rsem=("lscc_sem", "mean"),
         sccs_plain=("sccs_graph", "mean"), sccs_Rsem=("sccs_sem", "mean"),
@@ -87,8 +70,6 @@ def main():
     t2["method"] = t2.method.map(LAB)
     t2.to_csv(OUT / "tables" / "T2_connectivity.csv", index=False)
 
-    # T3: paired ACORN-γ − ACORN-1 (same predicate): realization-level and
-    # query-level (Wilcoxon signed-rank per condition, Holm over 12)
     w = per.pivot_table(index=["level", "realization"], columns="method", values="U_sem")
     w["diff"] = w.acorn_gamma - w.acorn_1
     t3 = []
@@ -103,8 +84,6 @@ def main():
                    if (g["diff"] != 0).any() else 1.0})
     t3 = pd.DataFrame(t3)
     t3.to_csv(OUT / "tables" / "T3_acorn1_vs_gamma_realization.csv", index=False)
-    # Query-level test needs the per-query reachability dumps (not tracked in
-    # git); without them, the committed table is reused unchanged.
     t3b = OUT / "tables" / "T3b_acorn1_vs_gamma_query_level.csv"
     have_dumps = all((D / "reach" / m / f"{n}_reach.csv").exists()
                      for m in ("acorn_1", "acorn_gamma") for n in man)
@@ -125,7 +104,6 @@ def main():
         print(f"note: per-query reach dumps absent; reusing committed {t3b}")
         q = pd.read_csv(t3b)
 
-    # T4: fragmentation effect (realization-level Kruskal-Wallis, Spearman)
     rank = {l: i for i, l in enumerate(LEVELS)}
     t4 = []
     for m, g in per.groupby("method"):
@@ -138,11 +116,9 @@ def main():
                    "worst_level": g.groupby("level").U_sem.mean().idxmax()})
     t4 = pd.DataFrame(t4)
     t4.to_csv(OUT / "tables" / "T4_fragmentation_tests.csv", index=False)
-    # within C100: U vs number of passing clusters (ACORN-1)
     c100 = per[(per.level == "C100")][["method", "realization", "passing_clusters", "U_sem"]]
     c100.to_csv(OUT / "tables" / "T4b_C100_islands.csv", index=False)
 
-    # T5: decomposition vs budget (realization 0) + baselines (Phase 4)
     a = pd.read_csv(D / "analysis_r0" / "aggregates.csv")
     b = pd.read_csv(B / "analysis" / "aggregates.csv")
     b["level"] = b.condition.map({"random_s0.0100": "random", "clustered_s0.0100": "C1000"})
@@ -185,7 +161,6 @@ def figures(per, t5):
     x = np.arange(len(LEVELS))
     xl = ["C100\n(1–2 clusters)", "C1000\n(10–11)", "random\n(max)"]
 
-    # F1: U vs fragmentation, realizations as dots (the main result)
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.8))
     for m in ("acorn_1", "acorn_gamma"):
         d = per[per.method == m]
@@ -206,7 +181,6 @@ def figures(per, t5):
     fig.savefig(OUT / "figures" / "F1_U_vs_fragmentation.png", dpi=150)
     plt.close(fig)
 
-    # F2: connectivity
     fig, ax = plt.subplots(figsize=(5.2, 3.8))
     for m in ("acorn_1", "acorn_gamma"):
         d = per[per.method == m]
@@ -220,7 +194,6 @@ def figures(per, t5):
     fig.savefig(OUT / "figures" / "F2_connectivity.png", dpi=150)
     plt.close(fig)
 
-    # F3: L, N(b), U on log scale (realization 0), ACORN only
     fig, axes = plt.subplots(2, 3, figsize=(12, 6), sharex=True, sharey=True)
     for i, m in enumerate(("ACORN-1", "ACORN-γ")):
         for j, l in enumerate(LEVELS):
@@ -242,7 +215,6 @@ def figures(per, t5):
     fig.savefig(OUT / "figures" / "F3_L_U_N_vs_budget.png", dpi=150)
     plt.close(fig)
 
-    # F4: recall vs effort with PRE/POST baselines (Phase 4 conditions)
     fig, axes = plt.subplots(1, 2, figsize=(10, 3.8), sharey=True)
     for ax, l in zip(axes, ("C1000", "random")):
         for m in ("PRE", "POST", "ACORN-1", "ACORN-γ"):

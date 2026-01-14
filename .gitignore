@@ -7,12 +7,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 
-# Data, indexes, attribute and ground-truth caches (regenerable; ~7 GB).
+# Data and indexes are large and can be rebuilt.
 data/
 
-# Results: raw per-query outputs are large and regenerable from the configs.
-# Tracked: the final structural report and the small summary / provenance
-# files it is built from (python/analysis/structural_report.py).
+# From results/, only the final report and its small summaries are kept.
 /results/*
 !/results/structural/
 /results/structural/*
@@ -22,7 +20,6 @@ data/
 !/results/structural/pilot/
 /results/structural/pilot/*
 !/results/structural/pilot/decision/
-# ... but never raw outputs, reachability dumps, sweeps, logs or run scripts
 /results/structural/**/logs/
 /results/structural/**/matrix*/
 /results/structural/**/*_reach.csv
@@ -31,5 +28,4 @@ data/
 /results/structural/**/per_query.csv
 /results/structural/**/run.sh
 
-# Agent workflow instructions (local only)
 CLAUDE.md

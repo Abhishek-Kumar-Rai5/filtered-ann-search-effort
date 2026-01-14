@@ -1,5 +1,3 @@
-// Filtered brute-force ground truth: everything downstream depends on it.
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -30,7 +28,6 @@ fse::FloatMatrix IntegerVectors(std::size_t n, std::size_t dim, unsigned seed,
   return m;
 }
 
-// Naive reference: sort all passing (distance, id) pairs, take k.
 std::vector<std::pair<float, std::int64_t>> Naive(
     const fse::FloatMatrix& base, const float* q,
     const std::vector<std::int32_t>& attr, std::int32_t qa, std::size_t k) {
@@ -58,7 +55,6 @@ TEST(GroundTruth, SquaredL2MatchesDefinition) {
 }
 
 TEST(GroundTruth, FilteredMatchesNaiveReferenceIncludingTies) {
-  // Small integer range forces many exact distance ties.
   const auto base = IntegerVectors(2000, 8, 1, 3);
   const auto queries = IntegerVectors(50, 8, 2, 3);
   std::mt19937 rng(3);
@@ -88,7 +84,7 @@ TEST(GroundTruth, FilteredMatchesNaiveReferenceIncludingTies) {
 }
 
 TEST(GroundTruth, ExactTieBrokenBySmallerId) {
-  fse::FloatMatrix base{{5, 1, 1, 0, 1, 2}, 6, 1};  // ids 1,2,4 at d=0 to q=1
+  fse::FloatMatrix base{{5, 1, 1, 0, 1, 2}, 6, 1};
   fse::FloatMatrix q{{1}, 1, 1};
   const std::vector<std::int32_t> attr(6, 1);
   const auto t = fse::FilteredGroundTruthEquals(base, q, attr, {1}, 3);
@@ -139,4 +135,4 @@ TEST(GroundTruth, NeighborTableRoundTrip) {
   EXPECT_EQ(r.distances, t.distances);
 }
 
-}  // namespace
+}

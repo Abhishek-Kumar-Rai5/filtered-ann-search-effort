@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# Controlled ACORN-only timing audit (docs/phase4_matrix.md §13).
-#   scripts/run_phase4_timing_audit.sh [config]
-# Refuses to start unless the VM is idle (1-min load < 1.0) and no other
-# fse_matrix process runs; logs load and the top CPU processes every 30 s.
-# Run detached: nohup setsid scripts/run_phase4_timing_audit.sh &
 set -uo pipefail
 cd "$(dirname "$0")/.."
 CFG=${1:-configs/phase4/timing_acorn_audit.yaml}

@@ -25,4 +25,4 @@ std::vector<double> LocalFilteredDensity(const NeighborTable& unfiltered_gt,
   return out;
 }
 
-}  // namespace fse
+}

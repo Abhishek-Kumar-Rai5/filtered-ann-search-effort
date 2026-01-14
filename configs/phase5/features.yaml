@@ -1,14 +1,12 @@
-# Phase 5 live features (docs/phase5_predictor.md §2). FROZEN 2026-10-06:
-# probe k = 20, ef = 20 on the shared post-filter hnswlib index; not tuned.
 experiment_name: phase5_features
 
 dataset:
   base: data/sift/sift_base.fvecs
   queries: data/sift/sift_query.fvecs
 
-selectivity: {min: 0.01, max: 1.0, levels: 6}   # Phase 4 levels (frozen)
+selectivity: {min: 0.01, max: 1.0, levels: 6}
 
-generator:                       # Phase 4 attributes (hash-verified on load)
+generator:
   cache_dir: data/cache/phase4
   attribute_hashes:
     random: "d9ee351d3dd6101b"
@@ -16,13 +14,13 @@ generator:                       # Phase 4 attributes (hash-verified on load)
 
 probe:
   index: data/cache/phase4/hnsw_post_m32_efc40_seed42.bin
-  index_hash: "2545153aadf3eee8"  # Phase 4 §8
+  index_hash: "2545153aadf3eee8"
   k: 20
   ef: 20
-  threads: 16                     # exact per-search counts are thread-local
+  threads: 16
 
 features:
-  score_concentration_k: 10       # d_1 / d_10 (Project 1 probe_k)
-  lid_k: 20                       # LID MLE over the 20 probe distances
+  score_concentration_k: 10
+  lid_k: 20
 
 output_dir: results/phase5/features

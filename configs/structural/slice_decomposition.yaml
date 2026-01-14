@@ -1,4 +1,3 @@
-# Vertical slice: L = U + N for ACORN-γ (Phase 4 sweeps) and ACORN-1 at s = 0.01.
 experiment_name: structural_slice_decomposition
 manifest: results/structural/slice/manifest.yaml
 k: 10

@@ -1,6 +1,3 @@
-// Phase 3: synthetic filter generator, mask ground truth, verified
-// ground-truth store, and the post-hoc local filtered density.
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -35,7 +32,6 @@ fse::FloatMatrix Gaussian(std::size_t rows, std::size_t dim,
   return m;
 }
 
-// Well-separated Gaussian blobs: clustered filters must follow them.
 fse::FloatMatrix Blobs(std::size_t per_blob, std::size_t blobs, std::size_t dim,
                        std::uint32_t seed) {
   std::mt19937 rng(seed);
@@ -43,8 +39,6 @@ fse::FloatMatrix Blobs(std::size_t per_blob, std::size_t blobs, std::size_t dim,
   fse::FloatMatrix m{std::vector<float>(per_blob * blobs * dim),
                      per_blob * blobs, dim};
   for (std::size_t b = 0; b < blobs; ++b) {
-    // Blob b sits on axis b % dim at distance 40 * (1 + b / dim): integer
-    // division on purpose, so blobs sharing an axis are 40 apart.
     const std::size_t tier = 1 + (b / dim);
     const float offset = 40.0F * static_cast<float>(tier);
     for (std::size_t i = 0; i < per_blob; ++i) {
@@ -77,8 +71,6 @@ TEST(SeededPermutation, IsADeterministicSeedDependentPermutation) {
 }
 
 TEST(UniformAttributes, UnchangedByRefactorPinnedToPhase1Draw) {
-  // Phase 1 draw A query attributes (results/phase1/.../query_attributes.csv)
-  // must not change: Phase 1's ground truth depends on them.
   const auto v = fse::UniformIntAttributes(8, 1, 12, 20261003);
   EXPECT_EQ(v, (std::vector<std::int32_t>{12, 8, 6, 7, 1, 7, 7, 6}));
 }
@@ -98,7 +90,7 @@ TEST(FilterConditions, SelectivityIsExactAndLevelsAreNested) {
     EXPECT_EQ(Count(f.mask), f.threshold);
     EXPECT_LE(std::abs(f.achieved_selectivity - s), 0.5 / n);
     for (std::size_t i = 0; i < n; ++i) {
-      EXPECT_TRUE(prev[i] == 0 || f.mask[i] != 0);  // nested
+      EXPECT_TRUE(prev[i] == 0 || f.mask[i] != 0);
     }
     prev = f.mask;
   }
@@ -135,13 +127,13 @@ TEST(FilterConditions, ClusteredIsDeterministicAndTakesWholeClusters) {
   EXPECT_EQ(a.rank, b.rank);
   EXPECT_EQ(a.cluster, b.cluster);
   EXPECT_EQ(a.content_hash, b.content_hash);
-  // rank is a permutation
+
   std::vector<std::int32_t> sorted = a.rank;
   std::sort(sorted.begin(), sorted.end());
   for (std::size_t i = 0; i < sorted.size(); ++i) {
     ASSERT_EQ(sorted[i], static_cast<std::int32_t>(i));
   }
-  // At every level, at most one cluster is partially included.
+
   for (const double s : {0.03, 0.1, 0.5}) {
     const auto f = fse::MakeFilterCondition(a, s, 1);
     std::map<std::int32_t, std::pair<std::size_t, std::size_t>> in_total;
@@ -156,14 +148,13 @@ TEST(FilterConditions, ClusteredIsDeterministicAndTakesWholeClusters) {
     }
     EXPECT_LE(partial, 1U) << "s=" << s;
   }
-  // A different order seed gives a different attribute.
+
   fse::ClusteredParams q = p;
   q.order_seed = 10;
   EXPECT_NE(fse::ClusteredRankAttribute(base, q).content_hash, a.content_hash);
 }
 
 TEST(FilterConditions, ClusteredConcentratesLocallyRandomDoesNot) {
-  // 20 well-separated blobs of 200; s = 0.1 is two blobs when clustered.
   const auto base = Blobs(200, 20, 16, 31);
   const auto queries = Blobs(10, 20, 16, 32);
   const auto unfiltered = fse::UnfilteredGroundTruth(base, queries, 10);
@@ -195,10 +186,10 @@ TEST(FilterConditions, ClusteredConcentratesLocallyRandomDoesNot) {
   }
   const auto [r_mean, r_var] = mean_var(dr);
   const auto [c_mean, c_var] = mean_var(dc);
-  EXPECT_NEAR(r_mean, 0.1, 0.05);            // random: density ~ s
-  EXPECT_LT(r_var, 0.02);                    // ~ binomial 0.1*0.9/10
-  EXPECT_GT(c_var, 5.0 * r_var);             // clustered: far more spread
-  EXPECT_GE(c_extreme, dc.size() * 9 / 10);  // mostly all-or-none
+  EXPECT_NEAR(r_mean, 0.1, 0.05);
+  EXPECT_LT(r_var, 0.02);
+  EXPECT_GT(c_var, 5.0 * r_var);
+  EXPECT_GE(c_extreme, dc.size() * 9 / 10);
   (void)c_mean;
 }
 
@@ -220,10 +211,10 @@ TEST(FilterConditions, RankAttributeRoundTripIsVerified) {
   EXPECT_EQ(r.correlation, fse::Correlation::kClustered);
   EXPECT_THROW(fse::ReadRankAttribute(path, a.content_hash + 1),
                std::runtime_error);
-  // Same masks and condition identity from the reloaded attribute.
+
   EXPECT_EQ(fse::MakeFilterCondition(r, 0.1, 5).condition_id,
             fse::MakeFilterCondition(a, 0.1, 5).condition_id);
-  // A corrupted payload is detected.
+
   {
     std::fstream f(path, std::ios::in | std::ios::out | std::ios::binary);
     f.seekp(40);
@@ -269,7 +260,7 @@ TEST(GroundTruth, StoreRejectsStaleOrWrongConditionGroundTruth) {
         fse::GroundTruthIdentity{1, 2, 9}}) {
     EXPECT_THROW(fse::ReadConditionGroundTruth(path, bad), std::runtime_error);
   }
-  // A plain (unverified) NeighborTable file is not accepted either.
+
   fse::WriteNeighborTable(path, t);
   EXPECT_THROW(fse::ReadConditionGroundTruth(path, id), std::runtime_error);
   std::filesystem::remove(path);
@@ -287,4 +278,4 @@ TEST(LocalDensity, FractionOfTrueNeighboursPassing) {
   EXPECT_THROW(fse::LocalFilteredDensity(gt, mask, 0), std::invalid_argument);
 }
 
-}  // namespace
+}

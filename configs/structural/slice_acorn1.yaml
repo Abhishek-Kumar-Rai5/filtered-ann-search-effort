@@ -1,19 +1,17 @@
-# Vertical slice: ACORN-1 sweeps on the Phase 4 s=0.01 conditions (random, clustered C=1000).
-# Phase 4 full matrix (docs/phase4_matrix.md section 1 -- frozen).
 experiment_name: structural_slice_acorn1
 
 dataset:
-  base: data/sift/sift_base.fvecs      # all 1,000,000
-  queries: data/sift/sift_query.fvecs  # all 10,000
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
 
 search:
   k: 10
-  gt_k: 11                 # ground-truth depth (tie detection)
+  gt_k: 11
 
 selectivity: {min: 0.01, max: 1.0, levels: 6}
 
-generator:                 # frozen Phase 3 generator, C = 1000 (section 6);
-  cache_dir: data/cache/phase4   # Phase 4 ground truth (same conditions)
+generator:
+  cache_dir: data/cache/phase4
   manifest: results/structural/slice/manifest.yaml
 
 budgets: [10, 20, 40, 80, 160, 320, 640, 1280, 2560]
@@ -23,23 +21,23 @@ methods:
     m: 32
     ef_construction: 40
     seed: 42
-    build_threads: 1       # bit-reproducible graph
-    overfetch_factor: 1.0  # round-1 fetch ceil(k/s)
+    build_threads: 1
+    overfetch_factor: 1.0
     growth_factor: 2.0
     max_rounds: 10
-    replay_queries: 200    # V5 replay audit per (condition, budget)
+    replay_queries: 200
     replay_seed: 20261301
   acorn:
-    gamma: 1               # frozen Phase 1 ACORN-1 build A (not rebuilt)
+    gamma: 1
     m: 32
     m_beta: 64
     index_path: data/cache/phase1/acorn_acorn_1_buildA.index
     index_hash: "d228d82803cf00cb"
     build_threads: 16
-    audit_base: 20000      # V5 +1 audit prefix
+    audit_base: 20000
     audit_queries: 50
 
-query_subset: {count: 0, seed: 0, first_n: true}   # 0 = all queries
+query_subset: {count: 0, seed: 0, first_n: true}
 sweep_threads: 16
 
 timing: {queries: 500, seed: 20261200, repeats: 3}

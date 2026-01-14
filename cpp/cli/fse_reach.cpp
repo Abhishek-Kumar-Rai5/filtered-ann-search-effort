@@ -1,18 +1,5 @@
-// Structural study: per-query target reachability (docs/structural_design.md
-// §3, §5).
-//
+// For every query, which true targets can the search reach at all?
 // Usage: fse_reach <config.yaml> <method>
-//
-// ACORN methods: the level-0 seed s0(q) of every query is recovered with the
-// instrumented ACORN search (faiss::acorn_level0_seed; independent of the
-// budget, so one search at ef = 10 suffices; cross-checked against the
-// sweeps' seed0 column in the analysis). For each condition, reachability of
-// each of the k exact targets from s0 under R_graph, R_sem (primary) and
-// R_cap. POST: the unfiltered HNSW level-0 graph; hnswlib's seed cannot be
-// observed, so reachability is evaluated from a member of the largest SCC and
-// the SCC statistics are reported (§3.3 item 5). Soundness (V-S2): every id
-// the matrix sweep returned, at every budget, must be reachable under the
-// primary notion.
 
 #include <omp.h>
 #include <yaml-cpp/yaml.h>
@@ -44,10 +31,10 @@ namespace {
 
 struct Graph {
   std::string method;
-  std::string kind;  // acorn | hnsw
+  std::string kind;
   std::string index_path;
   std::string index_hash;
-  std::string sweep_dir;  // <matrix>/<method>: raw_b*.bin per condition
+  std::string sweep_dir;
   int gamma = 0;
   int m = 0;
   int m_beta = 0;
@@ -171,8 +158,6 @@ std::string StatsJson(const fse::ReachStats& s) {
   return o.str();
 }
 
-// Soundness (V-S2): every passing id the sweep returned at any budget must
-// be reachable under the primary notion from the query's seed.
 std::size_t SoundnessViolations(const Config& c, const Graph& gc,
                                 const Cond& cd,
                                 const std::vector<std::int64_t>& seeds,
@@ -200,13 +185,12 @@ std::size_t SoundnessViolations(const Config& c, const Graph& gc,
   return bad;
 }
 
-// Per-run state shared by the per-condition steps.
 struct Ctx {
   const Config& c;
   const Graph& gc;
   const fse::FloatMatrix& queries;
   std::uint64_t query_hash = 0;
-  fse::AcornIndex* acorn = nullptr;  // null for the unfiltered HNSW graph
+  fse::AcornIndex* acorn = nullptr;
   const fse::CsrGraph& graph;
   fse::ReachAnalyzer* unfiltered = nullptr;
   std::string out_dir;
@@ -219,8 +203,6 @@ struct Analyzers {
   fse::ReachAnalyzer* primary = nullptr;
 };
 
-// Seeds and analyzers for one condition (ACORN: instrumented s0 per query;
-// HNSW: a member of the unfiltered graph's largest SCC).
 Analyzers Prepare(const Ctx& x, const Cond& cd,
                   std::vector<std::int64_t>* seeds) {
   Analyzers a;
@@ -245,7 +227,6 @@ Analyzers Prepare(const Ctx& x, const Cond& cd,
   return a;
 }
 
-// Writes <cond>_reach.csv; returns (distinct seeds, seeds failing filter).
 std::pair<std::size_t, std::size_t> WriteReachCsv(
     const Ctx& x, const Cond& cd, const fse::NeighborTable& gt,
     const std::vector<std::int64_t>& seeds, const Analyzers& a) {
@@ -274,7 +255,6 @@ std::pair<std::size_t, std::size_t> WriteReachCsv(
   return {distinct.size(), seed_fail};
 }
 
-// One condition: reach bits, soundness, statistics (JSON fragment).
 std::string ProcessCondition(const Ctx& x, const Cond& cd, std::size_t* bad,
                              std::size_t* checked) {
   const fse::NeighborTable gt = fse::ReadConditionGroundTruth(
@@ -339,7 +319,7 @@ int Run(const Config& c, const std::string& method) {
   } else {
     throw std::invalid_argument("unknown graph kind " + gc.kind);
   }
-  omp_set_num_threads(1);  // ACORN's seed/counter globals: one thread
+  omp_set_num_threads(1);
   const std::vector<char> no_mask;
   std::unique_ptr<fse::ReachAnalyzer> unfiltered;
   if (gc.kind == "hnsw") {
@@ -385,7 +365,7 @@ int Run(const Config& c, const std::string& method) {
   return total_bad == 0 ? 0 : 1;
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc != 3) {

@@ -44,7 +44,7 @@ std::string FirstLineStartingWith(const std::string& path,
   return "";
 }
 
-}  // namespace
+}
 
 std::string BuildInfoJson() {
   const BuildInfo b = GetBuildInfo();
@@ -200,4 +200,4 @@ std::string JsonObject::Render() const {
   return out + "}";
 }
 
-}  // namespace fse
+}

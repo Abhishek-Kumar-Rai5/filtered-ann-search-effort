@@ -85,7 +85,7 @@ HnswSearchResult HnswIndex::SearchAtCurrentEf(const float* query,
   r.distance_computations = counter;
   r.labels.resize(heap.size());
   r.dists.resize(heap.size());
-  // hnswlib returns a max-heap; fill from the back to get ascending order.
+
   for (std::size_t i = heap.size(); i-- > 0;) {
     r.dists[i] = heap.top().first;
     r.labels[i] = heap.top().second;
@@ -124,4 +124,4 @@ CsrGraph HnswIndex::Level0Graph() const {
   return g;
 }
 
-}  // namespace fse
+}

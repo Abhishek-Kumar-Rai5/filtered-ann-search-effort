@@ -1,7 +1,3 @@
-// Phase 5 live features: Project 1 definitions on hand-computed inputs (tests
-// ported from ann_router_staleness tests/test_features.cpp), LID against a
-// known-dimension analytic case, and the live density proxy.
-
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -75,4 +71,4 @@ TEST(LiveFeatures, PassingFractionReadsOnlyTheMask) {
   EXPECT_THROW((void)fse::PassingFraction({5}, mask), std::out_of_range);
 }
 
-}  // namespace
+}

@@ -8,8 +8,6 @@
 namespace fse {
 namespace {
 
-// Unbiased uniform draw in [0, range) by rejection: draws at or above the
-// largest multiple of `range` representable in 64 bits are rejected.
 std::uint64_t BoundedDraw(std::mt19937_64& rng, std::uint64_t range) {
   constexpr std::uint64_t kMax = std::numeric_limits<std::uint64_t>::max();
   const std::uint64_t limit = kMax - ((kMax % range) + 1) % range;
@@ -20,7 +18,7 @@ std::uint64_t BoundedDraw(std::mt19937_64& rng, std::uint64_t range) {
   return draw % range;
 }
 
-}  // namespace
+}
 
 std::vector<std::int32_t> UniformIntAttributes(std::size_t n, std::int32_t lo,
                                                std::int32_t hi,
@@ -47,7 +45,7 @@ std::vector<std::int32_t> SeededPermutation(std::size_t n, std::uint64_t seed) {
   for (std::size_t i = 0; i < n; ++i) {
     p[i] = static_cast<std::int32_t>(i);
   }
-  // Fisher-Yates from the back with unbiased bounded draws.
+
   std::mt19937_64 rng(seed);
   for (std::size_t i = n; i > 1; --i) {
     const auto j = static_cast<std::size_t>(BoundedDraw(rng, i));
@@ -56,4 +54,4 @@ std::vector<std::int32_t> SeededPermutation(std::size_t n, std::uint64_t seed) {
   return p;
 }
 
-}  // namespace fse
+}

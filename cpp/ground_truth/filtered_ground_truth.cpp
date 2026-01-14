@@ -11,9 +11,8 @@
 namespace fse {
 namespace {
 
-using Candidate = std::pair<float, std::int64_t>;  // (distance, id)
+using Candidate = std::pair<float, std::int64_t>;
 
-// Shared brute-force kernel: `passes(q, i)` decides membership.
 template <typename Pass>
 NeighborTable BruteForceTopK(const FloatMatrix& base,
                              const FloatMatrix& queries, std::size_t k,
@@ -34,8 +33,7 @@ NeighborTable BruteForceTopK(const FloatMatrix& base,
 #pragma omp parallel for schedule(dynamic, 16)
   for (std::int64_t q = 0; q < nq; ++q) {
     const auto qu = static_cast<std::size_t>(q);
-    // Max-heap on (distance, id): the top is the current worst candidate,
-    // and lexicographic order makes the smaller id win exact ties.
+
     std::priority_queue<Candidate> heap;
     for (std::size_t i = 0; i < base.rows; ++i) {
       if (!passes(qu, i)) {
@@ -59,7 +57,7 @@ NeighborTable BruteForceTopK(const FloatMatrix& base,
   return t;
 }
 
-}  // namespace
+}
 
 float SquaredL2(const float* a, const float* b, std::size_t dim) {
   float acc = 0.0F;
@@ -142,7 +140,7 @@ NeighborTable ReadNeighborTable(const std::string& path) {
 namespace {
 constexpr std::array<char, 8> kGtMagic = {'F', 'S', 'E', 'G',
                                           'T', 'v', '1', '\0'};
-}  // namespace
+}
 
 void WriteConditionGroundTruth(const std::string& path,
                                const GroundTruthIdentity& id,
@@ -197,4 +195,4 @@ NeighborTable ReadConditionGroundTruth(const std::string& path,
   return t;
 }
 
-}  // namespace fse
+}

@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Structural validation experiment (docs/structural_design.md §5).
-#   scripts/run_structural_mvp.sh
-# Requires the conditions manifest (fse_fragment_conditions). Pre-/post-filter
-# sweeps run one condition at a time (16 OpenMP threads); ACORN-γ and ACORN-1
-# sweeps run as single-threaded processes in parallel (process-global
-# counters); then fse_reach per method. Logs START/OK/FAIL with load.
-# Run detached: nohup setsid scripts/run_structural_mvp.sh &
 set -uo pipefail
 cd "$(dirname "$0")/.."
 MAN=results/structural/mvp/conditions/manifest.yaml
@@ -15,7 +8,7 @@ mkdir -p "$LOG"
 mapfile -t CONDS < <(grep -o 'name: [^,]*' "$MAN" | cut -d' ' -f2)
 fail=0
 
-step() {  # step <label> <cmd...>
+step() {
   local label=$1
   shift
   echo "$(date -u +%FT%TZ) START $label (load $(cut -d' ' -f1 /proc/loadavg))"

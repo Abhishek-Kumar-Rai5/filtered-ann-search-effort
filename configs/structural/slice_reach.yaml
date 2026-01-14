@@ -1,4 +1,3 @@
-# Vertical slice: reachability for ACORN-γ (Phase 4 sweeps) and ACORN-1.
 experiment_name: structural_slice_reach
 dataset:
   base: data/sift/sift_base.fvecs

@@ -1,18 +1,3 @@
-"""Decision-experiment summary (docs/structural_results.md §1.1).
-
-s = 0.01; C100 x5, C1000 x5, random x2 realizations; ACORN-1 vs ACORN-γ.
-Reads the per-query reachability dumps written by fse_reach
-(<root>/reach/<method>/<condition>_reach.csv + reach.json) and the
-realization-0 decomposition (<root>/analysis_r0/aggregates.csv); writes the
-small summary files that python/analysis/structural_report.py builds on:
-<root>/decision_per_realization.csv, decision_U_summary.csv,
-decision_paired.csv and figures/decision_U_vs_fragmentation.png.
-
-Usage:
-  .venv/bin/python python/analysis/structural_decision_summary.py [root]
-  (default root: results/structural/pilot/decision)
-"""
-
 import json
 import sys
 from pathlib import Path

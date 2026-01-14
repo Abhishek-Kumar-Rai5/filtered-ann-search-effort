@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# Final structural study (docs/structural_design.md §4): s x C x 5
-# realizations; PRE, POST, ACORN-γ, ACORN-1. One selectivity block at a time;
-# a block whose decomposition validation fails stops the run.
-# Run detached: nohup setsid scripts/run_structural_final.sh &
 set -uo pipefail
 cd "$(dirname "$0")/.."
 F=results/structural/final

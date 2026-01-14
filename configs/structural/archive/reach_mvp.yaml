@@ -1,5 +1,3 @@
-# Structural validation experiment: per-query target reachability
-# (docs/structural_design.md §3, §5). Frozen indexes, verified by hash.
 experiment_name: structural_mvp_reach
 
 dataset:
@@ -8,7 +6,7 @@ dataset:
 
 manifest: results/structural/mvp/conditions/manifest.yaml
 k: 10
-budgets: [10, 20, 40, 80, 160, 320, 640, 1280, 2560]   # soundness over all
+budgets: [10, 20, 40, 80, 160, 320, 640, 1280, 2560]
 
 graphs:
   acorn_gamma:

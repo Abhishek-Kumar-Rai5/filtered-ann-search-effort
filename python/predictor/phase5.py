@@ -1,16 +1,3 @@
-"""Phase 5: live effort predictor vs the fixed-budget baseline.
-
-docs/phase5_predictor.md. Usage:
-  .venv/bin/python python/predictor/phase5.py configs/phase5/phase5.yaml
-
-Order of operations (enforced by structure): load -> split -> for each
-method: OOF probabilities, model family and tau chosen on TRAINING pairs
-only; B1 calibrated on TRAINING pairs only -> refit on training -> one
-evaluation on the test pairs (gate, regret, H2, ablations, figures). Nothing
-in selection receives a test outcome. True local density is read only for
-the post-hoc H2 analysis, after evaluation, and never enters a model.
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -33,10 +20,7 @@ pm = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(pm)
 
 
-# ------------------------------------------------------------------- data --
-
 class MethodData:
-    """Per-pair arrays for one method, pairs sorted by (condition, query)."""
 
     def __init__(self, rows: pd.DataFrame, budgets, feats: pd.DataFrame,
                  qfeat: pd.DataFrame, oracle: pd.DataFrame, success_recall: float):
@@ -58,7 +42,6 @@ class MethodData:
                   if "n_scanned" in r and r.n_scanned.notna().all() else None)
         has = self.succ.any(axis=1)
         self.oracle_idx = np.where(has, self.succ.argmax(axis=1), -1)
-        # cross-check against the frozen Phase 4 oracle
         o = oracle.set_index(["condition", "query_id"])
         ob = o.loc[list(zip(self.condition, self.query)), "oracle_budget"].to_numpy()
         mine = np.where(self.oracle_idx >= 0,
@@ -94,11 +77,7 @@ def load(cfg):
     return data, integrity
 
 
-# ------------------------------------------------------- training (train) --
-
 def select_router(d: MethodData, tr, names, folds, cfg):
-    """Training pairs only: OOF probabilities per family; per S*, the family
-    and tau with the lowest OOF cost reaching S*. Returns the selection."""
     x, succ, D, pc, q = d.x(names, tr), d.succ[tr], d.D[tr], d.probe_cost[tr], d.query[tr]
     oof = {fam: L.oof_probabilities(x, succ, q, folds, fam, cfg["models"])
            for fam in L.FAMILIES}
@@ -111,12 +90,10 @@ def select_router(d: MethodData, tr, names, folds, cfg):
             cands.append({"family": fam, "tau": tau, "oof_success": sr,
                           "oof_cost": cost, "feasible": feas})
         feas = [c for c in cands if c["feasible"]] or cands
-        best = min(feas, key=lambda c: c["oof_cost"])  # stable: simplest on ties
+        best = min(feas, key=lambda c: c["oof_cost"])
         sel[s_star] = {"chosen": best, "candidates": cands}
     return sel
 
-
-# ------------------------------------------------------- evaluation (test) --
 
 def evaluate(cfg, data, train_q, test_q, rng):
     out = {"gate": [], "policies": [], "regret": [], "per_condition": [],
@@ -128,13 +105,11 @@ def evaluate(cfg, data, train_q, test_q, rng):
     for m, d in data.items():
         tr = np.isin(d.query, train_q)
         te = ~tr
-        # ---- selection on training only
         sel = {fs: select_router(d, tr, names, folds, cfg)
                for fs, names in cfg["feature_sets"].items()}
         b1 = {s: L.calibrate_b1(d.succ[tr], d.D[tr], d.query[tr], u, s)
               for s in cfg["s_star"]}
         out["selection"][m] = {fs: {str(s): v for s, v in x.items()} for fs, x in sel.items()}
-        # ---- refit on all training pairs, one test evaluation
         qte, succ, D = d.query[te], d.succ[te], d.D[te]
         pc, oidx = d.probe_cost[te], d.oracle_idx[te]
         decisions = {}
@@ -148,7 +123,7 @@ def evaluate(cfg, data, train_q, test_q, rng):
                                            if not np.isfinite(ch["tau"]) else L.decide(p, ch["tau"]))
         for s_star in cfg["s_star"]:
             ib1 = L.b1_assign(qte, u, b1[s_star])
-            b2 = L.calibrate_b1(succ, D, qte, u, s_star)  # hindsight reference
+            b2 = L.calibrate_b1(succ, D, qte, u, s_star)
             ib2 = L.b1_assign(qte, u, b2)
             out["b1"].append({"method": m, "s_star": s_star, **b1[s_star],
                               "b2": b2, "b1_test_success": float(L.pick(succ, ib1).mean())})
@@ -187,7 +162,6 @@ def evaluate(cfg, data, train_q, test_q, rng):
                         rec["F_saving"] = float(1 - L.pick(d.F[te], idx).mean()
                                                 / L.pick(d.F[te], ib1).mean())
                     out["gate"].append(rec)
-            # per-condition (full router vs B1), reported not gated
             idx = decisions[("full", s_star)]
             dfc = pd.DataFrame({"condition": d.condition[te],
                                 "router_cost": pc + L.pick(D, idx),
@@ -210,17 +184,12 @@ def evaluate(cfg, data, train_q, test_q, rng):
     return out
 
 
-# ------------------------------------------------------- post-hoc H2 (test) --
-
 def _h2_task(y, preds, groups, seed, resamples, ci):
     rng = np.random.default_rng(seed)
     return L.cluster_bootstrap_spearman(y, preds, groups, rng, resamples, ci)
 
 
 def h2_analysis(cfg, out, density: pd.DataFrame):
-    """Spearman(regret, true local density) vs Spearman(regret, s) on test
-    pairs, per method, S*, router and correlation subgroup; query-cluster
-    bootstrap. Density is read here only (post hoc)."""
     bs = cfg["bootstrap"]
     dens = density.pivot_table(index=["condition", "query"], columns="k_local",
                                values="local_density")
@@ -250,9 +219,8 @@ def h2_analysis(cfg, out, density: pd.DataFrame):
         for k, v in diffs.items():
             row[k], row[f"{k}_ci"] = v["diff"], v["ci"]
         rows.append(row)
-    # proxy quality (post hoc): Spearman(rho_hat, true density) per condition
     pq = []
-    for m in cfg["methods"][:1]:  # features are method-independent
+    for m in cfg["methods"][:1]:
         meta = out["h2_inputs"][(m, "meta")]
         rho = dens.loc[list(zip(meta["condition"], meta["query"]))]
         for cond in np.unique(meta["condition"]):
@@ -264,8 +232,6 @@ def h2_analysis(cfg, out, density: pd.DataFrame):
                        "mean_rho100": float(rho[100].to_numpy()[k].mean())})
     return pd.DataFrame(rows), pd.DataFrame(pq)
 
-
-# ----------------------------------------------------------------- figures --
 
 def figures(cfg, out, outdir: Path):
     import matplotlib
@@ -339,8 +305,6 @@ def figures(cfg, out, outdir: Path):
     fig.savefig(outdir / "fig3_per_condition_cost_ratio.png", dpi=150)
     plt.close(fig)
 
-
-# -------------------------------------------------------------------- main --
 
 def main(config_path: str):
     cfg = yaml.safe_load(Path(config_path).read_text())

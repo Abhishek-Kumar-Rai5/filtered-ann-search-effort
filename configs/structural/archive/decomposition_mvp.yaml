@@ -1,9 +1,8 @@
-# Structural validation experiment: L = U + N decomposition and V-S checks.
 experiment_name: structural_mvp_decomposition
 manifest: results/structural/mvp/conditions/manifest.yaml
 k: 10
 reach_dir: results/structural/mvp/reach
-methods:                      # sweep_dir = <matrix>/<method>; reach = fse_reach graph
+methods:
   prefilter: {sweep_dir: results/structural/mvp/matrix/prefilter, reach: pre}
   postfilter: {sweep_dir: results/structural/mvp/matrix/postfilter, reach: postfilter}
   acorn_gamma: {sweep_dir: results/structural/mvp/matrix/acorn, reach: acorn_gamma}

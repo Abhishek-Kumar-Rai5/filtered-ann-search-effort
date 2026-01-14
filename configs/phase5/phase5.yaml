@@ -1,41 +1,37 @@
-# Phase 5 predictor protocol (docs/phase5_predictor.md). FROZEN 2026-10-06
-# before any model was fitted. Analysis/training only: reads the Phase 4
-# matrix (D, recall per budget), ACORN n_scanned (F, reported only) and the
-# Phase 5 live features; never reruns a search.
 experiment_name: phase5_predictor
 
 inputs:
   matrix: results/phase4/matrix
   nscan: results/phase4/nscan
   features: results/phase5/features
-  local_density: results/phase4/phase4_generator_full/local_density.csv  # post-hoc H2 only
+  local_density: results/phase4/phase4_generator_full/local_density.csv
 
-methods: [postfilter, acorn]       # pre-filter has no effort knob
-budgets: [10, 20, 40, 80, 160, 320, 640, 1280, 2560]   # frozen grid B (tiers)
-success_recall: 0.9                # per-query Recall@10 >= 0.9 (frozen §1.6)
-s_star: [0.90, 0.95, 0.99]         # co-primary success-rate targets
+methods: [postfilter, acorn]
+budgets: [10, 20, 40, 80, 160, 320, 640, 1280, 2560]
+success_recall: 0.9
+s_star: [0.90, 0.95, 0.99]
 
-split: {seed: 20261500, train_queries: 5000}   # of the 10,000 queries
-cv: {folds: 5, seed: 20261501}                 # grouped by query, training only
+split: {seed: 20261500, train_queries: 5000}
+cv: {folds: 5, seed: 20261501}
 
-feature_sets:                      # frozen; live features only
+feature_sets:
   full: [s, rho_hat, centroid_dist, score_concentration]
   minus_proxy: [s, centroid_dist, score_concentration]
   s_only: [s]
   full_lid: [s, rho_hat, centroid_dist, score_concentration, lid]
 
-models:                            # per-budget success models
-  lr: {C: 1.0, max_iter: 2000}     # standardised inputs
-  tree_depths: [2, 3, 4]           # random_state 0
-tau_grid_step: 0.001               # tau in [0, 1]
+models:
+  lr: {C: 1.0, max_iter: 2000}
+  tree_depths: [2, 3, 4]
+tau_grid_step: 0.001
 
-b1_hash_seed: 20261502             # deterministic per-query mix assignment
+b1_hash_seed: 20261502
 
 bootstrap: {seed: 20261503, resamples: 2000, resamples_spearman: 1000, ci: 0.95}
 
-gate:                              # per method; all three S* must pass
-  min_saving: 0.10                 # mean-cost saving vs B1
-  alpha: 0.01                      # Wilcoxon signed-rank (per-query mean cost)
-  min_dsuccess_lb: -0.01           # lower CI bound of success(router) - success(B1)
+gate:
+  min_saving: 0.10
+  alpha: 0.01
+  min_dsuccess_lb: -0.01
 
 output_dir: results/phase5

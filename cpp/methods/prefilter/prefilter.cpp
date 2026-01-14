@@ -19,8 +19,6 @@ FilteredSearchResult PrefilterSearch(const FloatMatrix& base,
   r.ids.assign(k, -1);
   r.distances.assign(k, std::numeric_limits<float>::infinity());
 
-  // Step 1: the filtered subset. Step 2: exact distances to that subset only.
-  // Max-heap on (distance, id): top is the current worst kept candidate.
   using Candidate = std::pair<float, std::int64_t>;
   std::priority_queue<Candidate> heap;
   for (std::size_t i = 0; i < base.rows; ++i) {
@@ -46,4 +44,4 @@ FilteredSearchResult PrefilterSearch(const FloatMatrix& base,
   return r;
 }
 
-}  // namespace fse
+}

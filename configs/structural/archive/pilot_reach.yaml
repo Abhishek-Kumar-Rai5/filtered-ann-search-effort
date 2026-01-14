@@ -1,4 +1,3 @@
-# Fragmentation pilot: reachability for ACORN-γ and ACORN-1.
 experiment_name: structural_pilot_reach
 dataset:
   base: data/sift/sift_base.fvecs

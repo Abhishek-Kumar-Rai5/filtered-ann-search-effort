@@ -1,21 +1,18 @@
-# Phase 4 full matrix (docs/phase4_matrix.md section 1 -- frozen).
-# Controlled ACORN-only timing audit (docs/phase4_matrix.md §13): copy of
-# matrix.yaml; only experiment_name, timing.mode/pin_core and output_dir differ.
 experiment_name: phase4_timing_acorn_audit
 
 dataset:
-  base: data/sift/sift_base.fvecs      # all 1,000,000
-  queries: data/sift/sift_query.fvecs  # all 10,000
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
 
 search:
   k: 10
-  gt_k: 11                 # ground-truth depth (tie detection)
+  gt_k: 11
 
 selectivity: {min: 0.01, max: 1.0, levels: 6}
 
-generator:                 # frozen Phase 3 generator, C = 1000 (section 6);
-  cache_dir: data/cache/phase4   # attributes and ground truth from the
-  attribute_hashes:              # full-scale validation run (verified on load)
+generator:
+  cache_dir: data/cache/phase4
+  attribute_hashes:
     random: "d9ee351d3dd6101b"
     clustered: "1244cce0305ac7b6"
 
@@ -26,21 +23,21 @@ methods:
     m: 32
     ef_construction: 40
     seed: 42
-    build_threads: 1       # bit-reproducible graph
-    overfetch_factor: 1.0  # round-1 fetch ceil(k/s)
+    build_threads: 1
+    overfetch_factor: 1.0
     growth_factor: 2.0
     max_rounds: 10
-    replay_queries: 200    # V5 replay audit per (condition, budget)
+    replay_queries: 200
     replay_seed: 20261301
   acorn:
-    gamma: 100             # 1/s_min (ACORN paper rule)
+    gamma: 100
     m: 32
     m_beta: 64
     build_threads: 16
-    audit_base: 20000      # V5 +1 audit prefix
+    audit_base: 20000
     audit_queries: 50
 
-query_subset: {count: 0, seed: 0, first_n: true}   # 0 = all queries
+query_subset: {count: 0, seed: 0, first_n: true}
 sweep_threads: 16
 
 timing: {queries: 500, seed: 20261200, repeats: 3, mode: acorn_audit, pin_core: 3}

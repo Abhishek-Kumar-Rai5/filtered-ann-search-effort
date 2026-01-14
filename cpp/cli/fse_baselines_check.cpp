@@ -1,22 +1,3 @@
-// Phase 2 driver: correctness validation of the pre-filter and post-filter
-// baselines against exact brute-force filtered ground truth on a small case
-// (docs/design_doc.md section 21, Phase 2; docs/phase2_baselines.md).
-// Everything is driven by one YAML config; nothing is hard-coded here.
-//
-// Usage: fse_baselines_check <config.yaml>
-//
-// For each toy filter condition (uniform integer attribute over `values`
-// values, equality predicate) it checks, per query:
-//   pre-filter   ids == ground truth (same (distance, id) order), recall 1,
-//                filter respected, distances exact, distance computations ==
-//                number of passing vectors, filter checks == N
-//   post-filter  for every efSearch in the grid: filter respected, sorted,
-//                distances correct, recall vs ground truth, distance
-//                computations == independent replay of its rounds, serial ==
-//                parallel; plus an exhaustive setting (ef >= N, whole-index
-//                fetch) that must reproduce the ground truth exactly (up to
-//                exact distance ties)
-
 #include <omp.h>
 #include <yaml-cpp/yaml.h>
 
@@ -49,7 +30,7 @@ namespace {
 
 struct Condition {
   std::string name;
-  std::int32_t values = 0;  // attribute domain size: selectivity ~ 1/values
+  std::int32_t values = 0;
   std::uint64_t base_seed = 0;
   std::uint64_t query_seed = 0;
 };
@@ -115,7 +96,6 @@ void Log(const std::string& msg) {
   std::cout << "[fse_baselines_check] " << msg << '\n' << std::flush;
 }
 
-// Aggregated checks for one (condition, method, setting).
 struct Tally {
   std::size_t queries = 0;
   double recall_sum = 0.0;
@@ -124,14 +104,14 @@ struct Tally {
   std::uint64_t filter_checks_sum = 0;
   std::uint64_t rounds_sum = 0;
   std::uint32_t rounds_max = 0;
-  std::size_t padded = 0;               // returned -1 slots
-  std::size_t filter_violations = 0;    // returned id fails the filter
-  std::size_t distance_mismatches = 0;  // returned distance != recomputed
-  std::size_t unsorted = 0;             // results not in ascending distance
-  std::size_t accounting_errors = 0;    // effort != independent count
-  std::size_t gt_id_mismatch = 0;       // ids != GT (pre-filter, exhaustive)
-  std::size_t gt_tie_only = 0;          // ids differ only by exact ties
-  std::size_t parallel_mismatch = 0;    // parallel run != serial run
+  std::size_t padded = 0;
+  std::size_t filter_violations = 0;
+  std::size_t distance_mismatches = 0;
+  std::size_t unsorted = 0;
+  std::size_t accounting_errors = 0;
+  std::size_t gt_id_mismatch = 0;
+  std::size_t gt_tie_only = 0;
+  std::size_t parallel_mismatch = 0;
 
   [[nodiscard]] bool Clean() const {
     return filter_violations == 0 && distance_mismatches == 0 &&
@@ -166,7 +146,6 @@ struct Tally {
   }
 };
 
-// Checks common to both methods: filter, distances, order, recall, padding.
 void CheckResult(const fse::FilteredSearchResult& r, const float* query,
                  const fse::FloatMatrix& base, const char* mask,
                  const std::int64_t* gt_ids, std::size_t k, Tally* t) {
@@ -195,7 +174,6 @@ void CheckResult(const fse::FilteredSearchResult& r, const float* query,
   }
 }
 
-// ids equal to GT, or (if not) equal only up to exact distance ties.
 void CompareToGt(const fse::FilteredSearchResult& r,
                  const fse::NeighborTable& gt, std::size_t q, std::size_t k,
                  Tally* t) {
@@ -210,8 +188,6 @@ void CompareToGt(const fse::FilteredSearchResult& r,
   }
 }
 
-// One toy filter condition: attributes, exact ground truth (existing
-// reference implementation), per-query masks and exact selectivities.
 struct ConditionData {
   fse::NeighborTable gt;
   std::vector<std::vector<char>> masks;
@@ -268,7 +244,7 @@ Tally CheckPrefilter(const Config& c, const Condition& cond,
         fse::PrefilterSearch(base, queries.Row(q), k, d.masks[q].data());
     CheckResult(r, queries.Row(q), base, d.masks[q].data(), d.gt.Ids(q), k, &t);
     CompareToGt(r, d.gt, q, k, &t);
-    // Effort must be exactly the passing count (distances) and N (checks).
+
     const bool exact_effort =
         r.distance_computations == d.passing[q] && r.filter_checks == base.rows;
     t.accounting_errors += exact_effort ? 0 : 1;
@@ -276,8 +252,7 @@ Tally CheckPrefilter(const Config& c, const Condition& cond,
                   d.selectivity[q],
                   fse::RecallAtK(r.ids.data(), d.gt.Ids(q), k), r);
   }
-  // The pre-filter is exact and ties break like the ground truth: even a
-  // tie-only difference is an error here.
+
   t.gt_id_mismatch += t.gt_tie_only;
   return t;
 }
@@ -288,8 +263,6 @@ struct Setting {
   bool exhaustive = false;
 };
 
-// Serial pass with all checks, then the same queries in parallel, which must
-// give identical results and effort. index ef must equal the setting's.
 Tally CheckPostfilterSetting(const Config& c, const Condition& cond,
                              const ConditionData& d, const Setting& st,
                              const fse::FloatMatrix& base,
@@ -310,7 +283,7 @@ Tally CheckPostfilterSetting(const Config& c, const Condition& cond,
     if (st.exhaustive) {
       CompareToGt(r, d.gt, q, k, &t);
     }
-    // Independent effort count: replay the same rounds directly.
+
     std::uint64_t replay = 0;
     for (std::uint32_t round = 1; round <= r.rounds; ++round) {
       const std::size_t fetch =
@@ -362,8 +335,6 @@ std::string RunCondition(const Config& c, const Condition& cond,
   rows.push_back(pre.Json("prefilter", "exact"));
   Log(cond.name + " prefilter: " + (pre.Clean() ? "all checks pass" : "FAIL"));
 
-  // ef grid, then ef >= N with a whole-index fetch, which must reproduce the
-  // ground truth exactly.
   std::vector<Setting> settings;
   settings.reserve(c.ef_grid.size() + 1);
   for (const std::size_t ef : c.ef_grid) {
@@ -376,10 +347,10 @@ std::string RunCondition(const Config& c, const Condition& cond,
        {base.rows, static_cast<double>(base.rows), c.growth_factor, 1},
        true});
   for (const Setting& st : settings) {
-    index.SetEf(st.params.ef_search);  // once; searches are then thread-safe
+    index.SetEf(st.params.ef_search);
     const Tally t =
         CheckPostfilterSetting(c, cond, d, st, base, queries, index, per_query);
-    // At an exhaustive budget recall must be exactly 1.
+
     const bool ok = t.Clean() && (!st.exhaustive || t.recall_min == 1.0);
     *all_clean = *all_clean && ok;
     rows.push_back(t.Json("postfilter", st.name));
@@ -402,7 +373,7 @@ std::string RunCondition(const Config& c, const Condition& cond,
       .Render();
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc != 2) {
@@ -424,7 +395,6 @@ int main(int argc, char** argv) {
     Log("base " + std::to_string(base.rows) + " x " + std::to_string(base.dim) +
         ", queries " + std::to_string(queries.rows));
 
-    // One HNSW index serves every condition: construction is filter-blind.
     fse::HnswIndex index(base.dim, base.rows, c.hnsw);
     index.Add(base, 0, c.build_threads);
 

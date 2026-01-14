@@ -1,15 +1,3 @@
-// Cross-method distance-computation accounting audit (Phase 2 follow-up,
-// docs/phase2_baselines.md section 12). Controlled experiment, no change to
-// ACORN or hnswlib:
-//  * ACORN is given a counting vector store through its public
-//    IndexACORN(Index* storage, ...) constructor (IndexACORNFlat is exactly
-//    IndexACORN(new IndexFlat(d), ...)), so every distance evaluation of its
-//    search is counted independently of ACORN's own acorn_stats.n3.
-//  * The counting store must not change behaviour: same results and same
-//    native counts as IndexACORNFlat built identically (single-threaded).
-//  * Claim under test: exact evaluations - native n3 == kAcornUncounted (1,
-//    the entry-point distance) for every query, method, filter and efSearch.
-
 #include <faiss/IndexACORN.h>
 #include <faiss/IndexFlat.h>
 #include <faiss/impl/ACORN.h>
@@ -30,7 +18,6 @@
 
 namespace {
 
-// Counts every query-to-vector and vector-to-vector distance evaluation.
 struct CountingDistanceComputer : faiss::DistanceComputer {
   explicit CountingDistanceComputer(faiss::DistanceComputer* inner,
                                     std::uint64_t* count)
@@ -48,8 +35,6 @@ struct CountingDistanceComputer : faiss::DistanceComputer {
   std::uint64_t* count;
 };
 
-// IndexFlat (L2) whose distance computers count into one shared counter.
-// Used single-threaded only.
 struct CountingFlatL2 : faiss::IndexFlat {
   explicit CountingFlatL2(faiss::idx_t d) : faiss::IndexFlat(d) {}
   faiss::DistanceComputer* get_distance_computer() const override {
@@ -75,21 +60,19 @@ std::vector<float> Gaussian(std::size_t n, unsigned seed) {
 }
 
 struct Built {
-  std::vector<int> metadata;  // must outlive the index (ACORN keeps a ptr)
+  std::vector<int> metadata;
   std::unique_ptr<CountingFlatL2> storage;
   std::unique_ptr<faiss::IndexACORN> counted;
   std::unique_ptr<faiss::IndexACORNFlat> plain;
 };
 
-// Builds the same ACORN graph twice, single-threaded (deterministic): once
-// over a counting store, once as the standard IndexACORNFlat.
 void BuildBoth(int gamma, const std::vector<float>& base, Built* b) {
   b->metadata.assign(kN, 0);
   omp_set_num_threads(1);
   b->storage = std::make_unique<CountingFlatL2>(kDim);
   b->counted = std::make_unique<faiss::IndexACORN>(b->storage.get(), 16, gamma,
                                                    b->metadata, 32);
-  b->counted->add(kN, base.data());  // adds to storage, then builds graph
+  b->counted->add(kN, base.data());
   b->plain =
       std::make_unique<faiss::IndexACORNFlat>(kDim, 16, gamma, b->metadata, 32);
   b->plain->add(kN, base.data());
@@ -99,11 +82,11 @@ TEST(DistanceAccounting, AcornUncountsExactlyTheEntryPointPerQuery) {
   const auto base = Gaussian(kN, 1);
   const auto queries = Gaussian(kNq, 2);
   std::size_t checked = 0;
-  for (const int gamma : {4, 1}) {  // ACORN-gamma and ACORN-1
+  for (const int gamma : {4, 1}) {
     Built b;
     BuildBoth(gamma, base, &b);
     ASSERT_EQ(b.counted->ntotal, kN);
-    for (const int values : {1, 4, 25}) {  // selectivity 1, 1/4, 1/25
+    for (const int values : {1, 4, 25}) {
       const auto attr = fse::UniformIntAttributes(kN, 1, values, 3);
       for (const int efs : {10, 40, 160}) {
         b.counted->acorn.efSearch = efs;
@@ -132,10 +115,9 @@ TEST(DistanceAccounting, AcornUncountsExactlyTheEntryPointPerQuery) {
           b.plain->search(1, qv, kK, d_p.data(), ids_p.data(), row.data());
           const std::uint64_t native_p = faiss::acorn_stats.n3 - n3_p0;
 
-          // The counting store does not change ACORN's behaviour.
           ASSERT_EQ(ids_c, ids_p);
           ASSERT_EQ(native_c, native_p);
-          // The claim: a fixed, exact per-query offset.
+
           ASSERT_EQ(exact - native_c, fse::kAcornUncountedPerQuery)
               << "gamma=" << gamma << " values=" << values << " efs=" << efs
               << " q=" << q << " native=" << native_c << " exact=" << exact;
@@ -154,10 +136,6 @@ TEST(DistanceAccounting, AcornUncountsExactlyTheEntryPointPerQuery) {
 }
 
 TEST(DistanceAccounting, HnswlibCounterIncludesEntryPointEvaluations) {
-  // One-element index: no neighbours, so every counted evaluation is an
-  // entry-point evaluation. hnswlib evaluates the entry node once in the
-  // upper-layer descent setup and once more when seeding the base-layer
-  // search; CountingL2Space sees both (it counts real evaluations).
   const auto one = Gaussian(1, 4);
   fse::FloatMatrix base{one, 1, kDim};
   fse::HnswIndex index(kDim, 1, fse::HnswParams{.m = 16, .seed = 1});
@@ -168,4 +146,4 @@ TEST(DistanceAccounting, HnswlibCounterIncludesEntryPointEvaluations) {
   EXPECT_EQ(r.distance_computations, 2U);
 }
 
-}  // namespace
+}

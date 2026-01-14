@@ -1,7 +1,3 @@
-// hnswlib wrapper (ported from Project 1): search correctness against brute
-// force, exact per-query distance counting, thread safety at a fixed ef,
-// save/load round trip, and seeded reproducibility.
-
 #include <gtest/gtest.h>
 #include <omp.h>
 
@@ -96,7 +92,7 @@ TEST(HnswIndex, DistanceCountIsPerQueryAndGrowsWithEf) {
     EXPECT_GT(small.distance_computations, 0U);
     EXPECT_LT(small.distance_computations, base.rows);
     EXPECT_GT(large.distance_computations, small.distance_computations);
-    // Counter is reset per search: repeating gives the identical count.
+
     EXPECT_EQ(index.Search(queries.Row(q), 10, 10).distance_computations,
               small.distance_computations);
   }
@@ -168,4 +164,4 @@ TEST(HnswIndex, LabelsHonourFirstLabelOffset) {
   EXPECT_EQ(r.labels[0], 1017U);
 }
 
-}  // namespace
+}

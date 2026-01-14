@@ -1,6 +1,3 @@
-# Project core library. Modules (filter_generator, methods/, ground_truth,
-# feature_extraction, metrics) are added here as their phases begin; see
-# docs/design_doc.md section 18.
 add_library(fse_core
   common/build_info.cpp
   common/run_metadata.cpp
@@ -17,8 +14,6 @@ add_library(fse_core
   reachability/acorn_semantics.cpp
   reachability/reach.cpp
 )
-# Code that needs FAISS (shipped as ACORN's fork): the in-graph method
-# wrapper, and the Phase 3 filter generator (FAISS k-means).
 if(FSE_WITH_ACORN)
   target_sources(fse_core PRIVATE methods/ingraph/acorn_index.cpp
     filter_generator/filter_conditions.cpp)
@@ -46,26 +41,19 @@ if(FSE_CLANG_TIDY)
   set_target_properties(fse_core PROPERTIES CXX_CLANG_TIDY "${FSE_CLANG_TIDY}")
 endif()
 
-# Experiment drivers, each driven by a YAML config (added per phase).
 add_executable(fse_info cli/fse_info.cpp)
-# Phase 2: pre-/post-filter baseline correctness validation.
 add_executable(fse_baselines_check cli/fse_baselines_check.cpp)
 target_link_libraries(fse_baselines_check PRIVATE yaml-cpp::yaml-cpp)
 set(FSE_APPS fse_info fse_baselines_check)
 if(FSE_WITH_ACORN)
-  # Phase 1: ACORN paper SIFT1M reproduction (docs/phase1_acorn_repro.md).
   add_executable(fse_acorn_repro cli/fse_acorn_repro.cpp)
   target_link_libraries(fse_acorn_repro PRIVATE yaml-cpp::yaml-cpp)
-  # Phase 3: synthetic filter conditions + filtered ground truth.
   add_executable(fse_filter_conditions cli/fse_filter_conditions.cpp)
   target_link_libraries(fse_filter_conditions PRIVATE yaml-cpp::yaml-cpp)
-  # Phase 4: fixed-budget effort-selectivity matrix.
   add_executable(fse_matrix cli/fse_matrix.cpp)
   target_link_libraries(fse_matrix PRIVATE yaml-cpp::yaml-cpp)
-  # Phase 5: live probe features (docs/phase5_predictor.md).
   add_executable(fse_features cli/fse_features.cpp)
   target_link_libraries(fse_features PRIVATE yaml-cpp::yaml-cpp)
-  # Structural study (docs/structural_design.md).
   add_executable(fse_fragment_conditions cli/fse_fragment_conditions.cpp)
   target_link_libraries(fse_fragment_conditions PRIVATE yaml-cpp::yaml-cpp)
   add_executable(fse_reach cli/fse_reach.cpp)

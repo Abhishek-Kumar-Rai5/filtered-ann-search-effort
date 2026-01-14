@@ -1,15 +1,7 @@
-"""Phase 1: summarise the ACORN SIFT1M reproduction runs against the paper.
-
-Implements the pre-registered procedures of docs/phase1_acorn_repro.md
-(section 3.5) on the raw outputs of `fse_acorn_repro`:
-  * Table-3 value: distance computations at mean Recall@10 = 0.8, by linear
-    interpolation between the first bracketing pair of efSearch values;
-  * QPS: mean / median / stdev over the 50 timed batch trials per efSearch;
-and compares with the published values (section 4).
+"""Summarise the Phase 1 ACORN runs and compare them with the paper.
 
 Usage:
-  python python/analysis/phase1_acorn_summary.py RUN_DIR [RUN_DIR ...] \
-      --out results/phase1/summary
+  python python/analysis/phase1_acorn_summary.py RUN_DIR [RUN_DIR ...] --out results/phase1/summary
 """
 
 from __future__ import annotations
@@ -22,7 +14,6 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-# Published SIFT1M values (paper Tables 3-6; Fig. 7a read approximately).
 PAPER = {
     "table3_ndis_at_recall_0.8": {"acorn_gamma": 611.0, "acorn_1": 999.6},
     "table6_out_degree_acorn_gamma": [87.5, 384.0, 363.0, 25.3, 0.0],
@@ -33,14 +24,6 @@ RECALL_TARGET = 0.8
 
 
 def recall_crossing(efs, recall, ndis, target=RECALL_TARGET):
-    """First upward crossing of `target` in mean recall over sorted efs.
-
-    Returns a dict with the bracketing efs values, the linearly interpolated
-    mean distance computations at `target`, and the (uninterpolated) value at
-    the upper bracket. If recall is already >= target at the smallest efs,
-    or never reaches it, the corresponding fields are None and `status`
-    says why.
-    """
     order = np.argsort(np.asarray(efs))
     e = np.asarray(efs, dtype=float)[order]
     r = np.asarray(recall, dtype=float)[order]
@@ -66,9 +49,6 @@ def recall_crossing(efs, recall, ndis, target=RECALL_TARGET):
 
 
 def qps_at_recall(recall, qps, target):
-    """Descriptive only: QPS at `target` recall, interpolating log10(QPS)
-    linearly in recall between the bracketing points (curve sorted by
-    recall). None if the curve does not span `target`."""
     pts = sorted(zip(recall, qps))
     for (r0, q0), (r1, q1) in zip(pts, pts[1:]):
         if r0 <= target <= r1 and r1 > r0:
@@ -87,9 +67,6 @@ def _read_json(path: Path):
 
 
 def summarise_run(run_dir: Path) -> dict:
-    """One experiment directory as written by `fse_acorn_repro` stages:
-    <run_dir>/gt_checks.json (optional) and <run_dir>/<method>/{build,sweep,
-    verify,timing}.json + aggregate.csv + timing_trials.csv."""
     gt = _read_json(run_dir / "gt_checks.json")
     out = {"run_dir": str(run_dir), "experiment": run_dir.name,
            "gt_checks": gt, "methods": {}}

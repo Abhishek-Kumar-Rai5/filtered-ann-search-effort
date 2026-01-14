@@ -1,16 +1,3 @@
-// Phase 5 live feature extraction (docs/phase5_predictor.md §2).
-//
-// Usage: fse_features <config.yaml>
-//
-// One unfiltered probe per query on the shared post-filter hnswlib index
-// (frozen: k = 20, ef = 20), its exact distance computations counted. From it:
-// score concentration (d_1/d_10), LID (MLE, k = 20) and, per filter condition,
-// the live local-density proxy (fraction of the 20 probe results passing the
-// condition's mask). Centroid distance is ||q - base mean|| (one distance).
-// Filter masks are regenerated from the hash-verified Phase 4 attributes.
-// Ground truth is never read: no feature here can see the true filtered or
-// unfiltered neighbours.
-
 #include <omp.h>
 #include <yaml-cpp/yaml.h>
 
@@ -115,8 +102,6 @@ std::uint64_t HashFile(const std::string& path) {
   return h;
 }
 
-// The frozen Phase 4 conditions, regenerated from the hash-verified
-// attributes (same procedure as fse_matrix).
 std::vector<fse::FilterCondition> LoadConditions(const Config& c,
                                                  const fse::FloatMatrix& base,
                                                  std::uint64_t base_hash) {
@@ -259,7 +244,7 @@ int Run(const Config& c) {
   return 0;
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc != 2) {

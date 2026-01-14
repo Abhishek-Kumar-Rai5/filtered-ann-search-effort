@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Phase 4 sweep orchestration (docs/phase4_matrix.md section 4).
-#   scripts/run_phase4_matrix.sh <config.yaml> <log_dir> <condition>...
-# Pre-filter and post-filter sweeps run one condition at a time with 16
-# OpenMP threads (exact, thread-safe counters). ACORN sweeps run as one
-# single-threaded process per condition (process-wide counter), at most
-# ACORN_PROCS at once. Every sweep logs START/OK/FAIL with the load average.
-# Run detached: nohup setsid scripts/run_phase4_matrix.sh ... &
 set -uo pipefail
 cd "$(dirname "$0")/.."
 CFG=$1
@@ -17,7 +10,7 @@ BIN=./build/cpp/fse_matrix
 mkdir -p "$LOG"
 fail=0
 
-sweep() {  # sweep <method> <condition>
+sweep() {
   local m=$1 c=$2
   echo "$(date -u +%FT%TZ) START $m $c (load $(cut -d' ' -f1 /proc/loadavg))"
   if "$BIN" "$CFG" sweep "$m" "$c" > "$LOG/${m}_${c}.log" 2>&1; then

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Phase 4 step 2: full-scale generator validation, two separate runs (G8).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 OUT=results/phase4/phase4_generator_full

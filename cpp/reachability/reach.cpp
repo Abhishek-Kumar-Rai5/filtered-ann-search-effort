@@ -17,7 +17,7 @@ std::size_t FindRoot(std::vector<std::int32_t>* parent, std::size_t x) {
   return x;
 }
 
-}  // namespace
+}
 
 std::vector<std::int32_t> StronglyConnected(const CsrGraph& g,
                                             std::size_t* ncomp) {
@@ -28,7 +28,7 @@ std::vector<std::int32_t> StronglyConnected(const CsrGraph& g,
   std::vector<std::int32_t> comp(n, kUnset);
   std::vector<char> on_stack(n, 0);
   std::vector<std::int32_t> stack;
-  std::vector<std::pair<std::int32_t, std::uint64_t>> call;  // node, next edge
+  std::vector<std::pair<std::int32_t, std::uint64_t>> call;
   std::int32_t counter = 0;
   std::int32_t nc = 0;
   for (std::size_t root = 0; root < n; ++root) {
@@ -116,7 +116,6 @@ void ReachAnalyzer::Materialise(const std::vector<std::int32_t>& base_of) {
   }
 }
 
-// Condensation DAG: de-duplicated edges between distinct SCCs.
 void ReachAnalyzer::Condense() {
   std::vector<std::vector<std::int32_t>> out(ncomp_);
   for (std::size_t v = 0; v < h_.Nodes(); ++v) {
@@ -176,7 +175,7 @@ void ReachAnalyzer::ComputeStats(const std::vector<std::int32_t>& base_of) {
 
 const std::vector<char>& ReachAnalyzer::ReachFromSeed(std::int64_t seed) {
   const bool eligible = Eligible(seed);
-  // Memo key: the seed's SCC (eligible) or -(seed + 1) (ineligible seed).
+
   const std::int64_t key = eligible
                                ? comp_[static_cast<std::size_t>(
                                      local_[static_cast<std::size_t>(seed)])]
@@ -226,10 +225,10 @@ bool ReachAnalyzer::Reachable(std::int64_t seed, std::int64_t target) {
   }
   const std::int32_t lt = local_[static_cast<std::size_t>(target)];
   if (lt < 0) {
-    return false;  // ineligible target (e.g. fails the filter)
+    return false;
   }
   return ReachFromSeed(seed)[static_cast<std::size_t>(
              comp_[static_cast<std::size_t>(lt)])] != 0;
 }
 
-}  // namespace fse
+}

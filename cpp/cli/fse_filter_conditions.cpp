@@ -1,13 +1,3 @@
-// Phase 3 driver: build the synthetic filter conditions (selectivity levels x
-// correlation conditions) and their filtered ground truth, and validate them
-// (docs/phase3_filter_generator.md section 4). YAML-driven.
-//
-// Usage: fse_filter_conditions <config.yaml>
-//
-// Exit code 0 iff every check passes. summary.json carries a determinism
-// digest over all attributes, masks and ground truth: two runs of the same
-// config must print the same digest.
-
 #include <faiss/IndexFlat.h>
 #include <omp.h>
 #include <yaml-cpp/yaml.h>
@@ -57,18 +47,18 @@ struct Config {
   std::size_t homophily_sample = 0;
   std::size_t homophily_k = 0;
   std::uint64_t homophily_seed = 0;
-  // Check-2 correction (docs/phase3_filter_generator.md section 9).
+
   std::size_t null_draws = 0;
   std::uint64_t null_seed = 0;
   double alpha_family = 0.0;
   double kappa_min = 0.0;
   std::string output_dir;
   std::string cache_dir;
-  // Full-scale options (Phase 4; defaults reproduce the Phase 3 toy run).
-  std::string mode = "validation";  // or "calibration"
-  std::size_t gt_k = 0;             // ground-truth depth (default: k)
-  bool homophily_exact = true;      // false: sampled estimator (N = 1e6)
-  bool gt_recompute_check = true;   // second in-process GT computation
+
+  std::string mode = "validation";
+  std::size_t gt_k = 0;
+  bool homophily_exact = true;
+  bool gt_recompute_check = true;
   std::vector<std::size_t> calibration_candidates;
 };
 
@@ -148,8 +138,6 @@ std::uint64_t HashTable(const fse::NeighborTable& t) {
                            t.distances.size() * sizeof(float), h);
 }
 
-// Ground truth vs FAISS IndexFlatL2 over the passing subset (independent
-// library code path). Returns {identical, tie_only, mismatched}.
 std::array<std::size_t, 3> FaissCrossCheck(const fse::FloatMatrix& base,
                                            const fse::FloatMatrix& queries,
                                            const std::vector<char>& mask,
@@ -197,7 +185,7 @@ std::array<std::size_t, 3> FaissCrossCheck(const fse::FloatMatrix& base,
 struct DensityStats {
   double mean = 0.0;
   double var = 0.0;
-  double binomial_var = 0.0;  // s(1-s)/K: what independence would give
+  double binomial_var = 0.0;
   double frac_zero = 0.0;
   double frac_one = 0.0;
 };
@@ -223,21 +211,16 @@ struct Built {
   fse::GroundTruthIdentity identity;
   std::string gt_path;
   std::uint64_t gt_hash = 0;
-  double homophily = 0.0;  // original 1,000-sample estimator (record)
-  std::vector<DensityStats> density;  // one per local_density_k
-  // Corrected check 2 (section 9): exact homophily over all passing base
-  // vectors, its chance-corrected form, zero fraction per K, and the number
-  // of partially included clusters (clustered only).
+  double homophily = 0.0;
+  std::vector<DensityStats> density;
+
   double homophily_exact = 0.0;
   double kappa_h = 0.0;
-  std::vector<double> zero_fraction;  // one per local_density_k
+  std::vector<double> zero_fraction;
   std::size_t partial_clusters = 0;
-  std::size_t cells_spanned = 0;  // clusters with >= 1 passing vector
+  std::size_t cells_spanned = 0;
 };
 
-// Pre-specified correlation criteria (docs/phase3_filter_generator.md §4.2)
-// for one level s < 1, given the random and clustered conditions at that s.
-// Returns a human-readable failure list (empty = pass).
 std::string CorrelationFailures(const Built& rnd, const Built& clu,
                                 const std::vector<std::size_t>& ks,
                                 std::size_t nq) {
@@ -268,19 +251,17 @@ std::string CorrelationFailures(const Built& rnd, const Built& clu,
   return f.str();
 }
 
-// Everything shared by all conditions: data, hashes, post-hoc structure.
 struct Data {
   fse::FloatMatrix base;
   fse::FloatMatrix queries;
   std::uint64_t base_hash = 0;
   std::uint64_t query_hash = 0;
-  fse::NeighborTable unfiltered;  // queries' true unfiltered neighbours
+  fse::NeighborTable unfiltered;
   std::vector<std::int32_t> sample;
-  fse::NeighborTable base_knn;      // sampled base vectors' neighbours
-  fse::NeighborTable base_knn_all;  // every base vector's neighbours (toy)
+  fse::NeighborTable base_knn;
+  fse::NeighborTable base_knn_all;
 };
 
-// A post-hoc neighbour table cached under a verified identity.
 template <typename Compute>
 fse::NeighborTable CachedTable(const std::string& cache_dir,
                                const std::string& name, std::uint64_t base_hash,
@@ -309,9 +290,7 @@ Data LoadData(const Config& c) {
   const std::size_t n = d.base.rows;
   Log("base " + std::to_string(n) + " x " + std::to_string(d.base.dim) +
       ", queries " + std::to_string(d.queries.rows));
-  // Post-hoc structure for validation only (never a method input). The two
-  // neighbour tables are cached with a verified identity (they depend only
-  // on the data, K and the sample seed).
+
   const std::size_t k_loc_max =
       *std::max_element(c.local_density_k.begin(), c.local_density_k.end());
   d.unfiltered = CachedTable(
@@ -336,8 +315,7 @@ Data LoadData(const Config& c) {
                              return fse::UnfilteredGroundTruth(
                                  d.base, sample_vecs, c.homophily_k + 1);
                            });
-  // Exact homophily needs every base vector's neighbours: N x N brute force,
-  // feasible at toy scale only.
+
   if (c.homophily_exact) {
     d.base_knn_all =
         fse::UnfilteredGroundTruth(d.base, d.base, c.homophily_k + 1);
@@ -352,8 +330,6 @@ fse::RankAttribute MakeAttribute(const Config& c, const Data& d,
              : fse::ClusteredRankAttribute(d.base, c.clustered);
 }
 
-// One attribute per correlation condition; generated twice to check
-// in-process determinism.
 std::vector<fse::RankAttribute> BuildAttributes(const Config& c,
                                                 const Data& d) {
   std::vector<fse::RankAttribute> attrs;
@@ -391,7 +367,6 @@ void WriteHeaders(const Config& c, Outputs* out) {
   out->local_density << "condition,query,k_local,local_density\n";
 }
 
-// Number of clusters partially included by `mask` (clustered attribute).
 std::size_t CellsSpanned(const fse::RankAttribute& attr,
                          const std::vector<char>& mask) {
   std::vector<char> hit(attr.cluster_order.size(), 0);
@@ -419,8 +394,6 @@ std::size_t PartialClusters(const fse::RankAttribute& attr,
   return partial;
 }
 
-// Homophily used for kappa_h: exact over all passing base vectors (toy), or
-// the sampled estimator (full scale; docs/phase4_matrix.md section 3.1).
 double HomophilyFor(const Config& c, const Data& d,
                     const std::vector<char>& mask) {
   return c.homophily_exact
@@ -428,7 +401,6 @@ double HomophilyFor(const Config& c, const Data& d,
              : fse::SampledHomophily(d.base_knn, d.sample, mask, c.homophily_k);
 }
 
-// Corrected check-2 statistics of one condition (section 9.4).
 void RecordCorrectedStructure(const Config& c, const Data& d,
                               const fse::RankAttribute& attr, double s,
                               Built* b) {
@@ -440,22 +412,19 @@ void RecordCorrectedStructure(const Config& c, const Data& d,
   for (const std::size_t kl : c.local_density_k) {
     b->zero_fraction.push_back(fse::ZeroFraction(d.unfiltered, mask, kl));
   }
-  if (!attr.cluster.empty()) {  // whole clusters except at most one
+  if (!attr.cluster.empty()) {
     b->partial_clusters = PartialClusters(attr, mask);
     b->cells_spanned = CellsSpanned(attr, mask);
   }
 }
 
-// Builds one condition and runs checks 1, 3, 4, 5, 6a on it (and records
-// the post-hoc structure for check 2). `prev` is the previous level's mask
-// of the same attribute (nesting). Returns whether its checks pass.
 bool BuildAndCheckCondition(const Config& c, const Data& d,
                             const fse::RankAttribute& attr, double s,
                             std::vector<char>* prev, Outputs* out, Built* b) {
   const std::size_t n = d.base.rows;
   b->cond = fse::MakeFilterCondition(attr, s, d.base_hash);
   const fse::FilterCondition& f = b->cond;
-  // 1. selectivity exact, nested
+
   const auto count = static_cast<std::size_t>(std::count_if(
       f.mask.begin(), f.mask.end(), [](char x) { return x != 0; }));
   const double err = f.achieved_selectivity - s;
@@ -466,9 +435,9 @@ bool BuildAndCheckCondition(const Config& c, const Data& d,
   *prev = f.mask;
   const bool sel_ok = count == f.threshold &&
                       std::abs(err) <= 0.5 / static_cast<double>(n) && nested;
-  // 3. same query set (hash of the matrix actually used)
+
   const std::uint64_t qh = HashMatrix(d.queries);
-  // 4. fresh ground truth for this condition, stored with its identity
+
   const fse::NeighborTable gt =
       fse::FilteredGroundTruthMask(d.base, d.queries, f.mask, c.gt_k);
   b->identity = {f.condition_id, f.mask_hash, qh};
@@ -485,14 +454,14 @@ bool BuildAndCheckCondition(const Config& c, const Data& d,
                         stored.distances == gt.distances &&
                         again.ids == gt.ids && again.distances == gt.distances;
   b->gt_hash = HashTable(gt);
-  // 6a. every GT id passes this condition's filter
+
   std::size_t violations = 0;
   for (const std::int64_t id : gt.ids) {
     violations += (id < 0 || f.mask[static_cast<std::size_t>(id)] == 0) ? 1 : 0;
   }
-  // 5. independent verification
+
   const auto fx = FaissCrossCheck(d.base, d.queries, f.mask, gt);
-  // 2. correlation structure (post-hoc; judged across conditions later)
+
   b->homophily =
       fse::SampledHomophily(d.base_knn, d.sample, f.mask, c.homophily_k);
   RecordCorrectedStructure(c, d, attr, s, b);
@@ -527,7 +496,6 @@ bool BuildAndCheckCondition(const Config& c, const Data& d,
   return ok;
 }
 
-// Check 2, level by level for s < 1. Returns {levels judged, levels failed}.
 std::pair<std::size_t, std::size_t> CheckCorrelation(
     const Config& c, const std::vector<Built>& built, std::size_t n,
     std::size_t nq) {
@@ -536,7 +504,7 @@ std::pair<std::size_t, std::size_t> CheckCorrelation(
   for (const Built& rnd : built) {
     if (rnd.cond.correlation != fse::Correlation::kRandom ||
         rnd.cond.threshold == n) {
-      continue;  // s = 1 is the full index for both; not judged
+      continue;
     }
     for (const Built& clu : built) {
       if (clu.cond.correlation != fse::Correlation::kClustered ||
@@ -562,13 +530,10 @@ std::pair<std::size_t, std::size_t> CheckCorrelation(
   return {judged, failed};
 }
 
-// Independence null (section 9.4): per judged level (s < 1), R draws of each
-// statistic from additional random-condition attributes with validation-only
-// seeds, on the same queries, base vectors and thresholds.
 struct NullLevel {
   double s = 0.0;
-  std::vector<std::vector<double>> zero_fraction;  // [K index][draw]
-  std::vector<double> kappa_h;                     // [draw]
+  std::vector<std::vector<double>> zero_fraction;
+  std::vector<double> kappa_h;
 };
 
 std::vector<NullLevel> ComputeNull(const Config& c, const Data& d,
@@ -578,7 +543,7 @@ std::vector<NullLevel> ComputeNull(const Config& c, const Data& d,
   std::vector<NullLevel> out;
   for (const double s : levels) {
     if (fse::SelectivityThreshold(n, s) == n) {
-      continue;  // s = 1 not judged
+      continue;
     }
     NullLevel l;
     l.s = s;
@@ -632,9 +597,6 @@ NullMoments Moments(const std::vector<double>& v) {
   return m;
 }
 
-// One replacement statistic at one level: clustered must be in the null's
-// upper tail (p <= alpha'), random inside its two-sided 1 - alpha' interval.
-// Writes a CSV row; returns {random_ok, clustered_ok}.
 std::pair<bool, bool> JudgeStatistic(const std::string& level_name,
                                      const std::string& stat,
                                      const std::vector<double>& null,
@@ -655,7 +617,6 @@ std::pair<bool, bool> JudgeStatistic(const std::string& level_name,
   return {random_ok, clustered_ok};
 }
 
-// The random and clustered conditions at requested selectivity s.
 std::pair<const Built*, const Built*> FindPair(const std::vector<Built>& built,
                                                double s) {
   const Built* rnd = nullptr;
@@ -676,8 +637,6 @@ std::pair<const Built*, const Built*> FindPair(const std::vector<Built>& built,
   return {rnd, clu};
 }
 
-// Sub-criteria kept unchanged from section 4 (random dispersion and mean,
-// random homophily -- now exact -- and clustered D at K = 100).
 std::string UnchangedSubcriteria(const Config& c, const Built& rnd,
                                  const Built& clu, std::size_t nq) {
   std::ostringstream fails;
@@ -706,8 +665,6 @@ std::string UnchangedSubcriteria(const Config& c, const Built& rnd,
   return fails.str();
 }
 
-// Replacement criteria Z (zero-inflation per K) and H (kappa_h with floor),
-// each against the independence null, plus random consistency.
 std::string ReplacementCriteria(const Config& c, const NullLevel& nl,
                                 const Built& rnd, const Built& clu,
                                 const std::string& level, double alpha,
@@ -744,14 +701,11 @@ struct CorrectedResult {
   double min_clustered_kappa = 1.0;
 };
 
-// Corrected check 2 (section 9.4): unchanged sub-criteria + replacement
-// statistics vs the independence null + random consistency + integrity.
 CorrectedResult CheckCorrelationCorrected(const Config& c,
                                           const std::vector<Built>& built,
                                           const std::vector<NullLevel>& nulls,
                                           std::size_t nq,
                                           const std::string& csv_path) {
-  // The retained clustered-dispersion sub-criterion is defined at K = 100.
   if (std::find(c.local_density_k.begin(), c.local_density_k.end(), 100) ==
       c.local_density_k.end()) {
     throw std::invalid_argument("check 2 requires local_density_k to hold 100");
@@ -772,7 +726,7 @@ CorrectedResult CheckCorrelationCorrected(const Config& c,
     fails << ReplacementCriteria(c, nl, *rnd, *clu, level, res.alpha_per_test,
                                  &csv);
     res.min_clustered_kappa = std::min(res.min_clustered_kappa, clu->kappa_h);
-    // Integrity.
+
     if (clu->partial_clusters > 1) {
       fails << " partial clusters=" << clu->partial_clusters;
     }
@@ -788,8 +742,6 @@ CorrectedResult CheckCorrelationCorrected(const Config& c,
   return res;
 }
 
-// Check 6b: loading any condition's stored ground truth with another
-// condition's identity must be rejected. Returns {pairs, rejected}.
 std::pair<std::size_t, std::size_t> CheckSwaps(
     const std::vector<Built>& built) {
   std::size_t pairs = 0;
@@ -818,8 +770,6 @@ std::string JsonStrings(const std::vector<std::string>& v) {
   return out + "]";
 }
 
-// Per condition: queries whose K-NN contain >= 1 passing vector, and cells
-// spanned / partially included (docs/phase4_matrix.md G7).
 void WriteStructureExtra(const std::vector<Built>& built, std::size_t nq,
                          const std::string& path) {
   std::ofstream out(path);
@@ -836,9 +786,6 @@ void WriteStructureExtra(const std::vector<Built>& built, std::size_t nq,
   }
 }
 
-// Cluster-granularity calibration (docs/phase4_matrix.md section 2):
-// structural statistics only, per candidate C and level s < 1, then the
-// frozen selection rule. No ground truth, no search.
 int RunCalibration(const Config& c, const Data& d, const std::string& dir) {
   if (c.calibration_candidates.empty()) {
     throw std::invalid_argument("calibration: no candidates");
@@ -868,7 +815,7 @@ int RunCalibration(const Config& c, const Data& d, const std::string& dir) {
     for (const double s : levels) {
       const fse::FilterCondition f = fse::MakeFilterCondition(a, s, 0);
       if (f.threshold == n) {
-        continue;  // s = 1 not judged
+        continue;
       }
       const double kappa = fse::ChanceCorrected(HomophilyFor(c, d, f.mask), s);
       const auto ld = fse::LocalFilteredDensity(d.unfiltered, f.mask, 100);
@@ -891,8 +838,7 @@ int RunCalibration(const Config& c, const Data& d, const std::string& dir) {
         " min kappa_h=" + std::to_string(min_kappa));
     results.push_back({cand, eligible, min_kappa});
   }
-  // Frozen rule: among eligible candidates, the largest minimum kappa_h;
-  // candidates within 0.01 of that maximum are tied -> the largest C.
+
   double best = -1.0;
   for (const auto& [cand, eligible, min_kappa] : results) {
     if (eligible) {
@@ -936,7 +882,7 @@ int Run(const Config& c) {
     throw std::invalid_argument("unknown mode " + c.mode);
   }
   const std::vector<fse::RankAttribute> attrs = BuildAttributes(c, d);
-  // Persist the attributes for experiment processes (verified on load).
+
   std::vector<std::string> attr_files;
   for (const fse::RankAttribute& a : attrs) {
     const std::string path = c.cache_dir + "/attr_" +
@@ -961,11 +907,11 @@ int Run(const Config& c) {
       built.push_back(std::move(b));
     }
   }
-  // Original check 2 (sections 4 and 6), kept for the record only.
+
   Log("ORIGINAL check-2 criteria (superseded by section 9, record only):");
   const auto [corr_levels, corr_fail] =
       CheckCorrelation(c, built, d.base.rows, d.queries.rows);
-  // Corrected check 2 (section 9).
+
   Log("computing independence null: " + std::to_string(c.null_draws) +
       " draws");
   const std::vector<NullLevel> nulls = ComputeNull(c, d, levels);
@@ -1018,7 +964,7 @@ int Run(const Config& c) {
   return all_ok ? 0 : 1;
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc != 2) {

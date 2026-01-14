@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Phase 1 orchestration (docs/phase1_acorn_repro.md, deviation D1):
-#   1. exclusive: ground-truth checks, then index builds (TTI is timed)
-#   2. parallel:  per-query sweeps, one single-threaded process per
-#                 (run, method) -- ACORN's distance counter is a process-wide
-#                 global, so separate processes keep it race-free
-#   3. exclusive: verify + timing, one at a time (QPS must run alone)
-# Run detached:  nohup scripts/run_phase1.sh > results/phase1/logs/orchestrator.log 2>&1 &
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,7 +9,7 @@ RUNS=(acorn_sift1m_buildA_drawA acorn_sift1m_buildB_drawA acorn_sift1m_buildA_dr
 METHODS=(acorn_gamma acorn_1)
 mkdir -p "$LOG"
 
-stage() {  # stage <run> <stage> [method]
+stage() {
   local run=$1 st=$2 m=${3:-}
   local log="$LOG/${run}_${st}${m:+_$m}.log"
   echo "$(date -u +%FT%TZ) START $run $st $m"
@@ -28,7 +21,6 @@ stage() {  # stage <run> <stage> [method]
   fi
 }
 
-# 1. exclusive
 stage acorn_sift1m_buildA_drawA gt_checks
 stage acorn_sift1m_buildA_drawB gt_checks
 for run in "${RUNS[@]}"; do
@@ -37,7 +29,6 @@ for run in "${RUNS[@]}"; do
   done
 done
 
-# 2. parallel sweeps
 pids=()
 for run in "${RUNS[@]}"; do
   for m in "${METHODS[@]}"; do
@@ -49,7 +40,6 @@ fail=0
 for p in "${pids[@]}"; do wait "$p" || fail=1; done
 [[ $fail -eq 0 ]] || { echo "a sweep failed; stopping"; exit 1; }
 
-# 3. exclusive
 for run in "${RUNS[@]}"; do
   for m in "${METHODS[@]}"; do
     stage "$run" verify "$m"

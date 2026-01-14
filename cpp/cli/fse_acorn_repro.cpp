@@ -1,29 +1,3 @@
-// Phase 1 driver: reproduce the ACORN paper's SIFT1M LCPS benchmark
-// (docs/phase1_acorn_repro.md). Everything is driven by one YAML config; no
-// parameter is hard-coded here. ACORN itself is only called through
-// fse::AcornIndex, never modified.
-//
-// Usage:
-//   fse_acorn_repro <config.yaml> gt_checks
-//   fse_acorn_repro <config.yaml> {build|sweep|verify|timing} <method>
-//
-// The pipeline is split into stages so that each runs as its own process:
-//   gt_checks  ground truth vs. the official SIFT1M file and vs. FAISS
-//   build      build (timed, all threads) or load the cached index; save;
-//              reload check; structural statistics
-//   sweep      per-query pass over every efSearch value: recall, ACORN's
-//              distance counter, latency, filter / distance checks. Single
-//              threaded (the counter is an unsynchronised global), and
-//              memory-light (filter rows built per query), so sweeps of
-//              different methods/runs can run as parallel processes.
-//   verify     repeat queries in a fresh process and compare with the sweep's
-//              recorded output (determinism), and check the per-query counter
-//              sum against one batch call (counter consistency)
-//   timing     batch QPS over the paper grid, all queries, 1 warm-up + N
-//              timed trials; must run alone on the machine
-// Each stage writes <output_dir>/<experiment>/[<method>/]<stage>.json with the
-// git state, source fingerprint, build flags, hardware and its results.
-
 #include <faiss/IndexFlat.h>
 #include <faiss/impl/ACORN.h>
 #include <omp.h>
@@ -67,8 +41,8 @@ struct Config {
   std::string base_path;
   std::string query_path;
   std::string official_gt_path;
-  std::size_t max_base = 0;     // 0 = all
-  std::size_t max_queries = 0;  // 0 = all
+  std::size_t max_base = 0;
+  std::size_t max_queries = 0;
   std::int32_t attr_min = 0;
   std::int32_t attr_max = 0;
   std::uint64_t base_seed = 0;
@@ -79,8 +53,8 @@ struct Config {
   int build_threads = 0;
   std::vector<MethodConfig> methods;
   std::size_t k = 0;
-  std::vector<int> per_query_efs;  // union of dense + paper grids, sorted
-  std::vector<int> timing_efs;     // paper grid
+  std::vector<int> per_query_efs;
+  std::vector<int> timing_efs;
   int timing_threads = 0;
   int timing_warmup = 0;
   int timing_trials = 0;
@@ -95,7 +69,7 @@ struct Config {
 
 std::vector<int> Range(const YAML::Node& n) {
   const int from = n["from"].as<int>();
-  const int to = n["to"].as<int>();  // inclusive upper bound
+  const int to = n["to"].as<int>();
   const int step = n["step"].as<int>();
   if (step <= 0 || to < from) {
     throw std::invalid_argument("bad efs range");
@@ -228,15 +202,14 @@ std::uint64_t HashIds(const std::vector<std::int64_t>& ids) {
   return h;
 }
 
-// Everything a stage needs about the data and the filter condition.
 struct Workload {
   fse::FloatMatrix base;
   fse::FloatMatrix queries;
   std::vector<std::int32_t> base_attr;
   std::vector<std::int32_t> query_attr;
-  fse::NeighborTable gt_full;        // k + 1 per query (tie detection)
-  std::vector<std::int64_t> gt_ids;  // first k per query
-  double gt_seconds = 0.0;           // 0 if loaded from cache
+  fse::NeighborTable gt_full;
+  std::vector<std::int64_t> gt_ids;
+  double gt_seconds = 0.0;
 };
 
 std::string GroundTruthCachePath(const Config& c, std::size_t n,
@@ -291,7 +264,6 @@ void FillFilterRow(const Workload& w, std::size_t q, std::vector<char>* row) {
   }
 }
 
-// nq x N map, row-major [query][base], as test_acorn.cpp builds it.
 std::vector<char> FullFilterMap(const Workload& w) {
   const std::size_t n = w.base.rows;
   const std::size_t nq = w.queries.rows;
@@ -331,7 +303,6 @@ fse::AcornIndex LoadIndex(const Config& c, const MethodConfig& mc,
   return fse::AcornIndex::Load(path, w.base_attr);
 }
 
-// Common header of every stage's JSON record.
 fse::JsonObject StageRecord(const Config& c, const std::string& stage,
                             const std::string& method) {
   const fse::BuildInfo binfo = fse::GetBuildInfo();
@@ -363,10 +334,6 @@ void WriteJson(const std::string& path, const fse::JsonObject& r) {
   }
 }
 
-// ---------------------------------------------------------------- stages --
-
-// Selectivity, GT predicate violations and rank-k ties; writes the per-query
-// attribute file.
 void RecordGtSanity(const Config& c, const Workload& w,
                     const std::string& exp_dir, fse::JsonObject* r) {
   const std::size_t n = w.base.rows;
@@ -408,8 +375,6 @@ void RecordGtSanity(const Config& c, const Workload& w,
       .Int("gt_filter_violations", static_cast<std::int64_t>(violations));
 }
 
-// Unfiltered GT (same brute-force code) vs the official SIFT1M ground truth.
-// A row may differ only where the official id is at exactly our distance.
 void CheckOfficialGt(const Config& c, const Workload& w, fse::JsonObject* r) {
   const std::size_t nq = w.queries.rows;
   const std::size_t k = c.k;
@@ -447,8 +412,6 @@ void CheckOfficialGt(const Config& c, const Workload& w, fse::JsonObject* r) {
       std::to_string(tie_only) + ", mismatched " + std::to_string(mismatched));
 }
 
-// Filtered GT vs FAISS IndexFlatL2 over the filtered subset (independent
-// code path), for the first `faiss_crosscheck_queries` queries.
 void CheckFaissGt(const Config& c, const Workload& w, fse::JsonObject* r) {
   const std::size_t n = w.base.rows;
   const std::size_t k = c.k;
@@ -504,7 +467,7 @@ void StageGtChecks(const Config& c, const std::string& exp_dir) {
   fse::JsonObject r = StageRecord(c, "gt_checks", "");
   r.Num("ground_truth_seconds", w.gt_seconds);
   RecordGtSanity(c, w, exp_dir, &r);
-  if (c.official_gt_check && c.max_base == 0) {  // full base only
+  if (c.official_gt_check && c.max_base == 0) {
     CheckOfficialGt(c, w, &r);
   }
   CheckFaissGt(c, w, &r);
@@ -551,7 +514,6 @@ void StageBuild(const Config& c, const MethodConfig& mc,
       .Int("memory_bytes", static_cast<std::int64_t>(index.MemoryBytes()))
       .Int("file_bytes", static_cast<std::int64_t>(fs::file_size(path)));
 
-  // Reloaded index must give identical batch results.
   if (c.reload_check && built_here) {
     const std::vector<char> map = FullFilterMap(w);
     fse::AcornIndex reloaded = fse::AcornIndex::Load(path, w.base_attr);
@@ -607,7 +569,7 @@ void StageSweep(const Config& c, const MethodConfig& mc,
     std::size_t mism_total = 0;
     double max_err = 0.0;
     for (std::size_t q = 0; q < nq; ++q) {
-      FillFilterRow(w, q, &row);  // outside the timed search call
+      FillFilterRow(w, q, &row);
       const fse::AcornQueryResult res =
           index.SearchOne(w.queries.Row(q), k, row.data());
       std::size_t valid = 0;
@@ -652,7 +614,6 @@ void StageSweep(const Config& c, const MethodConfig& mc,
     total_violations += viol_total;
     total_mismatches += mism_total;
     if (paper.contains(efs)) {
-      // Raw results kept for verification (paper grid only).
       fse::NeighborTable raw{nq, k, all_ids, all_d};
       fse::WriteNeighborTable(dir + "/raw_efs" + std::to_string(efs) + ".bin",
                               raw);
@@ -669,11 +630,10 @@ void StageSweep(const Config& c, const MethodConfig& mc,
   WriteJson(dir + "/sweep.json", r);
 }
 
-// Reads the sweep's recorded per-query ndis and aggregate ids hash / total.
 struct SweepRecord {
   std::map<int, std::string> ids_hash;
   std::map<int, std::uint64_t> total_ndis;
-  std::map<int, std::vector<std::uint64_t>> ndis;  // only requested efs
+  std::map<int, std::vector<std::uint64_t>> ndis;
 };
 
 SweepRecord ReadSweep(const std::string& dir, const std::set<int>& want,
@@ -681,7 +641,7 @@ SweepRecord ReadSweep(const std::string& dir, const std::set<int>& want,
   SweepRecord s;
   std::ifstream agg(dir + "/aggregate.csv");
   std::string line;
-  std::getline(agg, line);  // header
+  std::getline(agg, line);
   while (std::getline(agg, line)) {
     std::vector<std::string> f;
     std::stringstream ls(line);
@@ -734,8 +694,6 @@ void StageVerify(const Config& c, const MethodConfig& mc,
     throw std::runtime_error("no sweep output in " + dir);
   }
 
-  // Determinism: a fresh process repeats the per-query pass; ids and every
-  // per-query distance count must equal the sweep's recorded values.
   omp_set_num_threads(1);
   std::vector<char> row;
   bool all_same = true;
@@ -761,8 +719,6 @@ void StageVerify(const Config& c, const MethodConfig& mc,
       .Str("determinism_detail", det.str());
   Log(mc.name + " determinism: " + det.str());
 
-  // Counter consistency and batch == per-query results, on the full nq x N
-  // map exactly as test_acorn.cpp passes it.
   const std::vector<char> map = FullFilterMap(w);
   omp_set_num_threads(c.timing_threads);
   bool counters_equal = true;
@@ -811,7 +767,7 @@ void StageTiming(const Config& c, const MethodConfig& mc,
                         d.data());
       const double secs = Now() - t0;
       if (t < 0) {
-        continue;  // warm-up, discarded
+        continue;
       }
       std::string rec_s;
       if (t == 0) {
@@ -834,7 +790,7 @@ void StageTiming(const Config& c, const MethodConfig& mc,
   WriteJson(dir + "/timing.json", r);
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc < 3 || argc > 4) {

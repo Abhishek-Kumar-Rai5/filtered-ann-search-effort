@@ -16,7 +16,7 @@ void RequireAtLeast(const std::vector<float>& sq_dists, std::size_t k,
   }
 }
 
-}  // namespace
+}
 
 std::vector<double> ComputeCentroid(const FloatMatrix& base) {
   if (base.rows == 0) {
@@ -91,4 +91,4 @@ double PassingFraction(const std::vector<std::size_t>& labels,
   return static_cast<double>(pass) / static_cast<double>(labels.size());
 }
 
-}  // namespace fse
+}

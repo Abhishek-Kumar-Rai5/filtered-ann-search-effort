@@ -1,4 +1,3 @@
-# Decision experiment: U for all completed realizations (no sweeps needed).
 experiment_name: structural_decision_reach
 dataset:
   base: data/sift/sift_base.fvecs
@@ -14,7 +13,7 @@ graphs:
     gamma: 100
     m: 32
     m_beta: 64
-    sweep_dir: ""   # U only: no sweeps for most realizations
+    sweep_dir: ""
   acorn_1:
     kind: acorn
     index_path: data/cache/phase1/acorn_acorn_1_buildA.index

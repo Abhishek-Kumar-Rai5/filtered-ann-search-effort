@@ -1,17 +1,3 @@
-"""Phase 4 effort-vs-selectivity, H3 cross-method and preliminary H2 analysis.
-
-docs/phase4_matrix.md §17. Analysis only: reads the existing Phase 4 outputs
-and writes into the configured output directory. Methodology (§16):
-D = exact distance computations is the primary cross-method effort; ACORN's
-F = n_scanned is supplementary and is never combined with D; latency is
-secondary evidence. The oracle (per-query b*) is the frozen one from
-phase4_matrix.compute_oracle. True local filtered density (design §8 measure
-2) is a post-hoc measurement only and is never a predictor input.
-
-Usage:
-  .venv/bin/python python/analysis/phase4_effort.py configs/phase4/effort_analysis.yaml
-"""
-
 from __future__ import annotations
 
 import importlib.util
@@ -34,11 +20,8 @@ PAIRS = (("prefilter", "postfilter"), ("prefilter", "acorn"),
          ("postfilter", "acorn"))
 
 
-# ------------------------------------------------------------- statistics --
-
 def bootstrap_median_ci(x: np.ndarray, rng: np.random.Generator,
                         resamples: int, ci: float):
-    """Median and percentile bootstrap CI over queries (+inf allowed)."""
     x = np.asarray(x, dtype=float)
     meds = np.empty(resamples)
     for i in range(0, resamples, 200):
@@ -49,7 +32,6 @@ def bootstrap_median_ci(x: np.ndarray, rng: np.random.Generator,
 
 
 def paired_log2_ratio(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """log2(a/b) per query; both censored (+inf) = 0 (same outcome)."""
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
     with np.errstate(divide="ignore", invalid="ignore"):
@@ -59,7 +41,6 @@ def paired_log2_ratio(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 def sign_test(a: np.ndarray, b: np.ndarray):
-    """Paired two-sided sign test of a vs b (ties dropped; +inf compares)."""
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)
     less = int(np.sum(a < b))
@@ -71,7 +52,6 @@ def sign_test(a: np.ndarray, b: np.ndarray):
 
 
 def holm(pvalues: list[float]) -> list[float]:
-    """Holm step-down adjusted p-values (same order as input)."""
     p = np.asarray(pvalues, dtype=float)
     order = np.argsort(p)
     adj = np.empty_like(p)
@@ -84,7 +64,6 @@ def holm(pvalues: list[float]) -> list[float]:
 
 
 def spearman(x: np.ndarray, y: np.ndarray) -> float:
-    """Spearman rho; NaN when either input is constant."""
     x = np.asarray(x, dtype=float)
     y = np.asarray(y, dtype=float)
     if np.all(x == x[0]) or np.all(y == y[0]):
@@ -95,10 +74,6 @@ def spearman(x: np.ndarray, y: np.ndarray) -> float:
 def cluster_bootstrap_spearman(frame: pd.DataFrame, effort: str,
                                predictors: list[str], rng: np.random.Generator,
                                resamples: int, ci: float):
-    """Spearman(effort, predictor) pooled over the conditions in `frame`, with
-    a bootstrap that resamples query ids (each query keeps all its condition
-    rows, so the paired structure is preserved). Also the CI of
-    |rho_a| - |rho_b| for every predictor pair (a, b)."""
     f = frame.sort_values(["query_id", "condition"])
     nq = f.query_id.nunique()
     if len(f) % nq or (f.groupby("query_id").size() != len(f) // nq).any():
@@ -127,8 +102,6 @@ def cluster_bootstrap_spearman(frame: pd.DataFrame, effort: str,
     return out, diffs
 
 
-# ------------------------------------------------------------------ data --
-
 def load(cfg: dict):
     inp = cfg["inputs"]
     df = pm.load_rows(Path(inp["matrix"]))
@@ -136,8 +109,6 @@ def load(cfg: dict):
     if not integrity["pass"]:
         raise RuntimeError(f"n_scanned join failed: {integrity}")
     oracle = pm.oracle_scan(pm.compute_oracle(df, cfg["oracle_target_recall"]), df)
-    # attach the oracle-point counters/latency of each query (secondary);
-    # pre-filter rows have budget 0 = its oracle budget
     pick = df[["method", "condition", "query_id", "budget", "latency_us",
                "filter_checks", "rounds"]].astype({"budget": float})
     oracle = oracle.merge(pick.rename(columns={"budget": "oracle_budget"}),
@@ -157,11 +128,7 @@ def load(cfg: dict):
     return df, oracle, integrity
 
 
-# --------------------------------------------------------------- analyses --
-
 def effort_curves(oracle: pd.DataFrame, rng, B: int, ci: float) -> pd.DataFrame:
-    """Median oracle D (and ACORN F) per method x condition, bootstrap CIs,
-    and the ratio to the same method/correlation at s = 1."""
     rows = []
     for (method, cond), d in oracle.groupby(["method", "condition"]):
         med, lo, hi = bootstrap_median_ci(d.oracle_dist.to_numpy(), rng, B, ci)
@@ -200,9 +167,6 @@ def fixed_budget_table(df: pd.DataFrame, fail_recall: float) -> pd.DataFrame:
 
 
 def h3_paired(oracle: pd.DataFrame, rng, B: int, ci: float, alpha: float):
-    """Per condition and method pair: paired per-query comparison of oracle D
-    (sign test, Holm over the family) and the median log2 ratio with a
-    bootstrap CI."""
     rows = []
     wide = oracle.pivot(index=["condition", "query_id"], columns="method",
                         values="oracle_dist").reset_index()
@@ -223,9 +187,6 @@ def h3_paired(oracle: pd.DataFrame, rng, B: int, ci: float, alpha: float):
 
 
 def h3_secondary(oracle: pd.DataFrame) -> pd.DataFrame:
-    """Secondary evidence per method x condition at the oracle point:
-    uncontrolled matrix latency and each method's own counter. ACORN's
-    controlled latency (timing audit, 500 queries) where available."""
     agg = {"latency_us_median_uncontrolled": ("latency_us", "median"),
            "filter_checks_median": ("filter_checks", "median"),
            "rounds_median": ("rounds", "median"),
@@ -236,14 +197,6 @@ def h3_secondary(oracle: pd.DataFrame) -> pd.DataFrame:
 
 
 def h2_structural(oracle: pd.DataFrame, rng, B: int, ci: float):
-    """Preliminary H2 on effort (regret needs the Phase 5 predictor):
-    (a) pooled over the six selectivities, per graph method and correlation
-        subgroup and for both subgroups together: Spearman of oracle effort
-        with global selectivity s vs true local density rho10 / rho100, with a
-        query-cluster bootstrap CI of each |rho| difference;
-    (b) within each condition (s constant): Spearman(effort, local density)
-        — variation that global selectivity cannot explain by construction.
-    Pre-filter is excluded: its effort is exactly T(s), a function of s."""
     preds = ["s_achieved", "rho10", "rho100"]
     pooled, within = [], []
     for method in ("postfilter", "acorn"):
@@ -280,8 +233,6 @@ def h2_structural(oracle: pd.DataFrame, rng, B: int, ci: float):
     return pd.DataFrame(pooled), pd.DataFrame(within)
 
 
-# ------------------------------------------------------------------- plots --
-
 COLORS = {"prefilter": "#2a78d6", "postfilter": "#eb6834", "acorn": "#1baf7a"}
 LABELS = {"prefilter": "pre-filter", "postfilter": "post-filter", "acorn": "ACORN"}
 
@@ -295,7 +246,6 @@ def plot_all(curves, fixed, within, out: Path):
                          "grid.color": "#e5e5e5", "grid.linewidth": 0.6})
     out.mkdir(parents=True, exist_ok=True)
 
-    # 1. oracle D vs s, per correlation (primary)
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True)
     for ax, corr in zip(axes, ("random", "clustered")):
         for method in METHODS:
@@ -312,7 +262,6 @@ def plot_all(curves, fixed, within, out: Path):
     fig.savefig(out / "fig1_oracle_D_vs_selectivity.png", dpi=150)
     plt.close(fig)
 
-    # 2. ACORN supplementary: D, F, controlled latency indexed to s = 1
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True)
     series = (("D_median", "D (distance computations)", "#1baf7a"),
               ("F_median", "F (n_scanned)", "#4a3aa7"),
@@ -333,7 +282,6 @@ def plot_all(curves, fixed, within, out: Path):
     fig.savefig(out / "fig2_acorn_D_F_latency_indexed.png", dpi=150)
     plt.close(fig)
 
-    # 3. fixed-budget mean recall vs budget (graph methods), one line per s
     levels = sorted(fixed.s_achieved.unique())
     shades = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#104281"]
     fig, axes = plt.subplots(2, 2, figsize=(9, 6), sharex=True, sharey=True)
@@ -357,7 +305,6 @@ def plot_all(curves, fixed, within, out: Path):
     fig.savefig(out / "fig3_fixed_budget_recall.png", dpi=150)
     plt.close(fig)
 
-    # 4. within-condition Spearman(D, rho10) per selectivity
     fig, axes = plt.subplots(1, 2, figsize=(9, 3.6), sharey=True)
     w = within[(within.effort == "oracle_dist") & (within.density == "rho10")]
     for ax, method in zip(axes, ("postfilter", "acorn")):
@@ -376,8 +323,6 @@ def plot_all(curves, fixed, within, out: Path):
     fig.savefig(out / "fig4_within_condition_spearman.png", dpi=150)
     plt.close(fig)
 
-
-# -------------------------------------------------------------------- main --
 
 def main(config_path: str) -> None:
     cfg = yaml.safe_load(Path(config_path).read_text())

@@ -1,23 +1,21 @@
-# Phase 4 effort / H3 / preliminary-H2 analysis (docs/phase4_matrix.md §17).
-# Analysis only: reads existing Phase 4 outputs, writes output_dir.
 experiment_name: phase4_effort_analysis
 
 inputs:
-  matrix: results/phase4/matrix                 # D, recall, latency, counters
-  nscan: results/phase4/nscan                   # ACORN F (n_scanned), §15
+  matrix: results/phase4/matrix
+  nscan: results/phase4/nscan
   local_density: results/phase4/phase4_generator_full/local_density.csv
-  timing_audit: results/phase4/timing_audit/timing_rows.csv   # §13
+  timing_audit: results/phase4/timing_audit/timing_rows.csv
 
-oracle_target_recall: 0.9      # frozen (§1.6)
-local_density_k: [10, 100]     # measure 2 (post-hoc only), as generated
-fixed_budget_fail_recall: 0.9  # "failed query" at a fixed budget
+oracle_target_recall: 0.9
+local_density_k: [10, 100]
+fixed_budget_fail_recall: 0.9
 
 bootstrap:
   seed: 20261400
-  resamples_median: 2000       # per-condition medians / paired ratios
-  resamples_spearman: 1000     # query-cluster bootstrap for correlations
+  resamples_median: 2000
+  resamples_spearman: 1000
   ci: 0.95
 
-h3_family_alpha: 0.01          # Holm-adjusted over all paired H3 tests
+h3_family_alpha: 0.01
 
 output_dir: results/phase4/effort_analysis

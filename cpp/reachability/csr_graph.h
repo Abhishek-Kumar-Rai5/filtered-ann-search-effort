@@ -1,9 +1,5 @@
 #pragma once
 
-// Directed adjacency in compressed sparse row form, list order preserved
-// (docs/structural_design.md §3: ACORN's 2-hop rule depends on list
-// positions). Node ids are base-vector ids; lists hold no -1 padding.
-
 #include <cstddef>
 #include <cstdint>
 #include <vector>
@@ -11,8 +7,8 @@
 namespace fse {
 
 struct CsrGraph {
-  std::vector<std::uint64_t> offsets;  // size nodes + 1
-  std::vector<std::int32_t> ids;       // concatenated neighbour lists
+  std::vector<std::uint64_t> offsets;
+  std::vector<std::int32_t> ids;
 
   [[nodiscard]] std::size_t Nodes() const {
     return offsets.empty() ? 0 : offsets.size() - 1;
@@ -25,4 +21,4 @@ struct CsrGraph {
   }
 };
 
-}  // namespace fse
+}

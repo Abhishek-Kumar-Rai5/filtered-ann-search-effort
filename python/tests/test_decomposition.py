@@ -1,5 +1,3 @@
-"""Tests for the structural decomposition L = U + N (structural_design §2)."""
-
 import importlib.util
 from pathlib import Path
 
@@ -37,7 +35,7 @@ def test_bits_to_matrix_and_padding_never_matches():
     assert m.tolist() == [[True, False, True], [False, False, False]]
     r = d.decompose(np.array([[-1, 3]]), np.array([[-1, -1]]),
                     np.array([[True, True]]))
-    assert r["L"].tolist() == [1.0]  # padding target never counts as found
+    assert r["L"].tolist() == [1.0]
 
 
 def test_gt_reader_checks_identity(tmp_path):

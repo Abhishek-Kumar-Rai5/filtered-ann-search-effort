@@ -1,5 +1,3 @@
-# Smoke test: whole Phase 1 pipeline on a 20K-vector subset, < 1 min.
-# Every value below is fixed in docs/phase1_acorn_repro.md (pre-registered).
 experiment_name: phase1_smoke
 
 dataset:
@@ -9,7 +7,7 @@ dataset:
   max_base: 20000
   max_queries: 200
 
-attributes:          # paper 7.1.1: random int 1..12, equals(y)
+attributes:
   min: 1
   max: 12
   base_seed: 20261002
@@ -18,16 +16,16 @@ attributes:          # paper 7.1.1: random int 1..12, equals(y)
 
 index:
   build_label: smoke
-  reuse_cached: false        # fresh build
+  reuse_cached: false
   build_threads: 16
-  methods:                   # efConstruction = ACORN default M*gamma
+  methods:
     - {name: acorn_gamma, gamma: 12, m: 32, m_beta: 64}
     - {name: acorn_1, gamma: 1, m: 32, m_beta: 64}
 
 search:
   k: 10
-  dense_efs: {from: 10, to: 30, step: 5}   # Table-3 crossing
-  paper_efs: {from: 10, to: 800, step: 50}  # paper curve grid: 10..760
+  dense_efs: {from: 10, to: 30, step: 5}
+  paper_efs: {from: 10, to: 800, step: 50}
 
 timing:
   threads: 16

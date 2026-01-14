@@ -1,8 +1,4 @@
 #!/usr/bin/env bash
-# FINAL structural run (user decision 2026-10-07): s = 0.01 only,
-# C100/C1000/C10000/random x 5 realizations, ACORN-1 and ACORN-γ; PRE/POST
-# baselines reuse the Phase 4 s = 0.01 results (POST not rerun).
-# Run detached: nohup setsid scripts/run_structural_final_acorn.sh &
 set -uo pipefail
 cd "$(dirname "$0")/.."
 F=results/structural/final

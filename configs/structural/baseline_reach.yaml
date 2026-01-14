@@ -1,4 +1,3 @@
-# FINAL baseline: POST reachability (unfiltered HNSW) on the Phase 4 s = 0.01 conditions.
 experiment_name: structural_final_baseline_reach
 dataset:
   base: data/sift/sift_base.fvecs

@@ -1,15 +1,3 @@
-"""Final structural study: tables, statistics, figures, artifact list.
-
-Usage:
-  .venv/bin/python python/analysis/structural_final.py results/structural/final
-
-Reads the per-selectivity-block outputs of decomposition.py
-(analysis_s<s>/{aggregates.csv, components.csv, decomposition_rows.csv.gz,
-validation.json}) and writes results/structural/final/final/. Realizations
-(5 per cell) are the replicate unit for between-condition statistics;
-query-level tests are secondary (queries are shared across conditions).
-"""
-
 from __future__ import annotations
 
 import glob
@@ -73,7 +61,6 @@ def load(root: Path):
 
 
 def u_table(agg):
-    """U per realization (budget-independent) -> across-realization summary."""
     u = agg[agg.budget == agg.groupby(["method", "condition"]).budget.transform("max")]
     u = u[["method", "s", "level", "realization", "condition", "passing_clusters",
            "U", "U_graph", "U_cap"]]
@@ -89,8 +76,6 @@ def u_table(agg):
 
 
 def paired_methods(u, root: Path):
-    """ACORN-γ − ACORN-1 U per cell: realization-level (n=5, t-CI, sign
-    count) and query-level Wilcoxon per realization (Holm over all)."""
     w = u.pivot_table(index=["s", "level", "realization", "condition"], columns="method",
                       values="U").reset_index()
     w["diff"] = w.acorn_gamma - w.acorn_1
@@ -119,8 +104,6 @@ def paired_methods(u, root: Path):
 
 
 def fragmentation_tests(u):
-    """Per method x s: Kruskal-Wallis across the 4 levels (realization U) and
-    Spearman of U with designed fragmentation rank (C100 < ... < random)."""
     rank = {lvl: i for i, lvl in enumerate(LEVELS)}
     rows = []
     for (m, s), g in u.groupby(["method", "s"]):
@@ -148,9 +131,6 @@ def selectivity_tests(u):
 
 
 def baseline(root: Path, agg: pd.DataFrame, out: Path):
-    """Phase 4 PRE/POST at s = 0.01 (random; clustered = C1000 r0, identical
-    masks) next to ACORN-1/ACORN-γ realization 0 of the same conditions:
-    recall, U, N and mean exact distance computations D per budget."""
     b = pd.read_csv(root / "baseline" / "analysis" / "aggregates.csv")
     b["recall"] = 1 - b.L
     b["level"] = b.condition.map({"random_s0.0100": "random", "clustered_s0.0100": "C1000"})
@@ -192,7 +172,6 @@ def figures(agg, comp, ut, out: Path):
     x = np.arange(len(LEVELS))
     u = agg[agg.budget == agg.groupby(["method", "condition"]).budget.transform("max")]
 
-    # 1. U vs fragmentation, per selectivity (ACORN-1 vs ACORN-γ; POST)
     fig, axes = plt.subplots(1, len(ss), figsize=(4.2 * len(ss), 3.6), sharey=True)
     for ax, s in zip(np.atleast_1d(axes), ss):
         for m in ("acorn_1", "acorn_gamma", "postfilter"):
@@ -213,7 +192,6 @@ def figures(agg, comp, ut, out: Path):
     fig.savefig(out / "fig1_U_vs_fragmentation.png", dpi=150)
     plt.close(fig)
 
-    # 2. recall vs budget, rows = s, cols = level
     fig, axes = plt.subplots(len(ss), len(LEVELS), figsize=(3.2 * len(LEVELS), 2.6 * len(ss)),
                              sharex=True, sharey=True, squeeze=False)
     for i, s in enumerate(ss):
@@ -238,7 +216,6 @@ def figures(agg, comp, ut, out: Path):
     fig.savefig(out / "fig2_recall_vs_budget.png", dpi=150)
     plt.close(fig)
 
-    # 3. share of residual loss that is topological, vs budget
     fig, axes = plt.subplots(1, len(ss), figsize=(4.2 * len(ss), 3.4), sharey=True)
     for ax, s in zip(np.atleast_1d(axes), ss):
         for m, ls in (("acorn_1", "-"), ("acorn_gamma", "--")):
@@ -255,7 +232,6 @@ def figures(agg, comp, ut, out: Path):
     fig.savefig(out / "fig3_U_share_vs_budget.png", dpi=150)
     plt.close(fig)
 
-    # 4. connectivity: largest SCC fraction, plain graph vs R_sem
     comp["lscc"] = comp.largest_scc / comp.nodes
     fig, axes = plt.subplots(1, len(ss), figsize=(4.2 * len(ss), 3.4), sharey=True)
     for ax, s in zip(np.atleast_1d(axes), ss):

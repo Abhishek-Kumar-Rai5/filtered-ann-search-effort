@@ -1,5 +1,3 @@
-// Seeded uniform attribute generator (ACORN paper's random-integer model).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -20,7 +18,6 @@ TEST(UniformAttributes, DeterministicForSeedAndDiffersAcrossSeeds) {
 }
 
 TEST(UniformAttributes, PrefixStableAcrossLengths) {
-  // Same seed => the shorter draw is a prefix of the longer one.
   const auto a = fse::UniformIntAttributes(100, 1, 12, 3);
   const auto b = fse::UniformIntAttributes(1000, 1, 12, 3);
   EXPECT_EQ(a, std::vector<std::int32_t>(b.begin(), b.begin() + 100));
@@ -36,7 +33,7 @@ TEST(UniformAttributes, ValuesInRangeAndApproximatelyUniform) {
     ++counts[x];
   }
   ASSERT_EQ(counts.size(), 12U);
-  // Expected 100,000 each; binomial sd ~ 303. 6 sd tolerance.
+
   for (const auto& [value, count] : counts) {
     EXPECT_NEAR(static_cast<double>(count), 100000.0, 1820.0) << value;
   }
@@ -49,4 +46,4 @@ TEST(UniformAttributes, DegenerateAndInvalidRanges) {
   EXPECT_TRUE(fse::UniformIntAttributes(0, 1, 12, 1).empty());
 }
 
-}  // namespace
+}

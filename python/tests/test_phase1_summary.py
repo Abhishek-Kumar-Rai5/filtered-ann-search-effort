@@ -1,5 +1,3 @@
-"""Tests for the pre-registered Phase 1 summary procedures."""
-
 import importlib.util
 import math
 from pathlib import Path
@@ -18,7 +16,6 @@ def test_crossing_interpolates_linearly_in_recall():
                                 [400, 500, 700])
     assert c["status"] == "ok"
     assert (c["efs_lo"], c["efs_hi"]) == (20, 30)
-    # 0.8 is 1/4 of the way from 0.78 to 0.86 -> 500 + 0.25 * 200.
     assert c["ndis_interp"] == pytest.approx(550.0)
     assert c["ndis_at_hi"] == 700
 
@@ -27,7 +24,7 @@ def test_crossing_uses_first_upward_crossing_and_sorts_by_efs():
     c = summary.recall_crossing([30, 10, 20, 40], [0.81, 0.79, 0.80, 0.79],
                                 [3, 1, 2, 4])
     assert (c["efs_lo"], c["efs_hi"]) == (10, 20)
-    assert c["ndis_interp"] == pytest.approx(2.0)  # exactly at target
+    assert c["ndis_interp"] == pytest.approx(2.0)
 
 
 def test_crossing_edge_cases():

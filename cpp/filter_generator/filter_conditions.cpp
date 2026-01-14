@@ -27,7 +27,7 @@ std::uint64_t HashAttributeImpl(const RankAttribute& a) {
                       a.cluster_order.size() * sizeof(std::int32_t), h);
 }
 
-}  // namespace
+}
 
 std::uint64_t RankAttributeHash(const RankAttribute& a) {
   return HashAttributeImpl(a);
@@ -57,7 +57,7 @@ std::vector<std::int32_t> ReadVec(std::ifstream& in) {
 constexpr std::array<char, 8> kAttrMagic = {'F', 'S', 'E', 'A',
                                             'T', 'v', '1', '\0'};
 
-}  // namespace
+}
 
 void WriteRankAttribute(const std::string& path, const RankAttribute& a) {
   std::ofstream out(path, std::ios::binary | std::ios::trunc);
@@ -139,7 +139,6 @@ RankAttribute ClusteredRankAttribute(const FloatMatrix& base,
   const auto d = static_cast<faiss::idx_t>(base.dim);
   const auto c = static_cast<faiss::idx_t>(p.num_clusters);
 
-  // k-means with FAISS's standard Clustering.
   faiss::ClusteringParameters cp;
   cp.niter = p.kmeans_iterations;
   cp.nredo = 1;
@@ -150,7 +149,6 @@ RankAttribute ClusteredRankAttribute(const FloatMatrix& base,
   faiss::IndexFlatL2 train_index(d);
   km.train(static_cast<faiss::idx_t>(n), base.data.data(), train_index);
 
-  // Every base vector joins its nearest centroid.
   faiss::IndexFlatL2 centroids(d);
   centroids.add(c, km.centroids.data());
   std::vector<float> dist(n);
@@ -164,8 +162,7 @@ RankAttribute ClusteredRankAttribute(const FloatMatrix& base,
   for (std::size_t i = 0; i < n; ++i) {
     a.cluster[i] = static_cast<std::int32_t>(assign[i]);
   }
-  // Seeded cluster order, and within each cluster the order induced by one
-  // seeded permutation of all vectors.
+
   a.cluster_order = SeededPermutation(p.num_clusters, p.order_seed);
   std::vector<std::int32_t> position(p.num_clusters);
   for (std::size_t j = 0; j < p.num_clusters; ++j) {
@@ -212,7 +209,7 @@ std::vector<double> LogSpacedSelectivities(double lo, double hi, int levels) {
   for (int i = 0; i < levels; ++i) {
     out.push_back(std::pow(10.0, a + (b - a) * i / (levels - 1)));
   }
-  out.back() = hi;  // exact upper end
+  out.back() = hi;
   return out;
 }
 
@@ -244,4 +241,4 @@ FilterCondition MakeFilterCondition(const RankAttribute& attr, double s,
   return f;
 }
 
-}  // namespace fse
+}

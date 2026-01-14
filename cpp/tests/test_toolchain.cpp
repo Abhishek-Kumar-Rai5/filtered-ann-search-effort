@@ -1,7 +1,3 @@
-// Phase 0 smoke tests: verify the toolchain, OpenMP, yaml-cpp, and that
-// hnswlib and ACORN compile and link as black boxes. No project logic is
-// tested here, and nothing here is the Phase 1 ACORN reproduction.
-
 #include <gtest/gtest.h>
 #include <omp.h>
 #include <yaml-cpp/yaml.h>
@@ -55,8 +51,6 @@ TEST(Toolchain, YamlCppParses) {
   EXPECT_EQ(node["selectivity"].size(), 2U);
 }
 
-// hnswlib's native filter callback (the documented in-graph fallback) must
-// only ever return allowed labels.
 class EvenLabelsOnly : public hnswlib::BaseFilterFunctor {
  public:
   bool operator()(hnswlib::labeltype id) override { return id % 2 == 0; }
@@ -69,9 +63,7 @@ TEST(HnswlibSmoke, FilterCallbackReturnsOnlyAllowedLabels) {
   const std::vector<float> data = RandomVectors(kN, kDim, 42);
 
   hnswlib::L2Space space(kDim);
-  hnswlib::HierarchicalNSW<float> index(&space, kN, /*M=*/16,
-                                        /*ef_construction=*/200,
-                                        /*random_seed=*/42);
+  hnswlib::HierarchicalNSW<float> index(&space, kN, 16, 200, 42);
   for (std::size_t i = 0; i < kN; ++i) {
     index.addPoint(&data[i * kDim], i);
   }
@@ -89,7 +81,7 @@ TEST(HnswlibSmoke, FilterCallbackReturnsOnlyAllowedLabels) {
 }
 
 #ifdef FSE_WITH_ACORN
-// ACORN links and its filtered search only returns filter-passing ids.
+
 TEST(AcornSmoke, FilteredSearchReturnsOnlyPassingIds) {
   constexpr int kDim = 16;
   constexpr faiss::idx_t kN = 500;
@@ -101,11 +93,9 @@ TEST(AcornSmoke, FilteredSearchReturnsOnlyPassingIds) {
   for (faiss::idx_t i = 0; i < kN; ++i) {
     metadata[i] = static_cast<int>(i % 2);
   }
-  faiss::IndexACORNFlat index(kDim, /*M=*/16, /*gamma=*/2, metadata,
-                              /*M_beta=*/16);
+  faiss::IndexACORNFlat index(kDim, 16, 2, metadata, 16);
   index.add(kN, data.data());
 
-  // filter_id_map is row-major [query][base]: pass even ids only.
   std::vector<char> filter_id_map(kNq * kN);
   for (faiss::idx_t q = 0; q < kNq; ++q) {
     for (faiss::idx_t i = 0; i < kN; ++i) {
@@ -124,4 +114,4 @@ TEST(AcornSmoke, FilteredSearchReturnsOnlyPassingIds) {
 }
 #endif
 
-}  // namespace
+}

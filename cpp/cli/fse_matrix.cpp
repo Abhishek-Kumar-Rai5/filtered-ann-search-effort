@@ -1,20 +1,6 @@
-// Phase 4 driver: the fixed-budget effort-selectivity matrix
-// (docs/phase4_matrix.md). YAML-driven; every frozen parameter comes from
-// the config. Reuses the validated Phase 1-3 components unchanged.
-//
-// Usage:
-//   fse_matrix <config.yaml> build_post
-//   fse_matrix <config.yaml> build_acorn
-//   fse_matrix <config.yaml> audit_acorn
-//   fse_matrix <config.yaml> sweep {prefilter|postfilter|acorn} <condition>
-//   fse_matrix <config.yaml> timing
-//     (timing.mode: all_methods = frozen §1.7 pass; acorn_audit = the
-//     controlled ACORN-only audit, §13)
-//
-// A sweep writes <output_dir>/<method>/<condition>/{per_query.csv,
-// raw_b<budget>.bin, sweep.json}. Ground truth and generator attributes are
-// only ever loaded through verified identities (condition id, mask hash,
-// query hash; attribute content hash).
+// Runs one stage of the effort matrix: index builds, the ACORN audit, a sweep
+// or the timing pass. Usage: fse_matrix <config.yaml> <stage> [method
+// condition]
 
 #include <faiss/IndexACORN.h>
 #include <faiss/impl/ACORN.h>
@@ -66,39 +52,37 @@ struct Config {
   double s_min = 0.0;
   double s_max = 0.0;
   int levels = 0;
-  std::map<std::string, std::uint64_t> attribute_hashes;  // per correlation
-  std::string manifest;  // structural study: conditions from a manifest
+  std::map<std::string, std::uint64_t> attribute_hashes;
+  std::string manifest;
   std::string generator_cache_dir;
   std::vector<std::size_t> budgets;
-  // post-filter
+
   fse::HnswParams hnsw;
   int post_build_threads = 1;
-  fse::PostfilterParams post;  // ef_search set per budget
+  fse::PostfilterParams post;
   std::size_t replay_queries = 0;
   std::uint64_t replay_seed = 0;
-  // Opt-in (structural final study): budgets b <= first-round fetch are
-  // provably identical (every round searches with max(b, fetch_r) = fetch_r;
-  // Phase 4 V8); compute once and reuse. Default off (Phase 4 unchanged).
+
   bool post_reuse_inert = false;
-  // ACORN
+
   fse::AcornParams acorn;
   int acorn_build_threads = 16;
   std::size_t audit_base = 0;
   std::size_t audit_queries = 0;
-  std::string acorn_index_path;  // optional override (frozen index file)
-  std::string acorn_index_hash;  // verified when set
-  // query subset (pilot / determinism re-run): 0 = all queries
+  std::string acorn_index_path;
+  std::string acorn_index_hash;
+
   std::size_t subset_queries = 0;
   std::uint64_t subset_seed = 0;
-  bool subset_first_n = true;  // true: first n queries; false: seeded sample
+  bool subset_first_n = true;
   std::vector<std::string> only_budgets_note;
-  int sweep_threads = 16;  // pre/post-filter OpenMP threads
-  // timing pass
+  int sweep_threads = 16;
+
   std::size_t timing_queries = 0;
   std::uint64_t timing_seed = 0;
   int timing_repeats = 0;
-  std::string timing_mode = "all_methods";  // or "acorn_audit"
-  int timing_pin_core = -1;                 // acorn_audit: required core
+  std::string timing_mode = "all_methods";
+  int timing_pin_core = -1;
   std::string index_dir;
   std::string output_dir;
 };
@@ -239,7 +223,6 @@ fse::JsonObject RecordHeader(const Config& c, const std::string& stage) {
   return r;
 }
 
-// Queries used by a sweep: all, the first n, or a seeded sample (sorted).
 std::vector<std::size_t> QueryIds(const Config& c, std::size_t nq) {
   std::vector<std::size_t> ids;
   if (c.subset_queries == 0 || c.subset_queries >= nq) {
@@ -263,16 +246,11 @@ std::vector<std::size_t> QueryIds(const Config& c, std::size_t nq) {
   return ids;
 }
 
-// The frozen conditions, regenerated from the stored, hash-verified
-// attributes (no k-means re-run).
 struct Conditions {
   std::vector<fse::FilterCondition> list;
   std::uint64_t base_hash = 0;
 };
 
-// Structural study: conditions listed in a manifest written by
-// fse_fragment_conditions; every attribute, condition id and mask hash is
-// verified on load (docs/structural_design.md §5 V-S5).
 Conditions LoadManifestConditions(const Config& c, Conditions out) {
   const YAML::Node m = YAML::LoadFile(c.manifest);
   if (m["base_hash"].as<std::string>() != fse::Hex64(out.base_hash)) {
@@ -331,8 +309,6 @@ const fse::FilterCondition& FindCondition(const Conditions& cs,
   throw std::invalid_argument("unknown condition " + name);
 }
 
-// ---------------------------------------------------------------- builds --
-
 int BuildPost(const Config& c) {
   const fse::FloatMatrix base = fse::ReadFvecs(c.base_path);
   fs::create_directories(c.index_dir);
@@ -365,8 +341,7 @@ int BuildAcorn(const Config& c) {
   const fse::FloatMatrix base = fse::ReadFvecs(c.base_path);
   fs::create_directories(c.index_dir);
   fse::JsonObject r = RecordHeader(c, "build_acorn");
-  // Construction is predicate-agnostic; the attribute array only has to be
-  // valid memory (ACORN reads, but does not use, the values).
+
   fse::AcornIndex index(static_cast<int>(base.dim), c.acorn,
                         std::vector<std::int32_t>(base.rows, 0));
   omp_set_num_threads(c.acorn_build_threads);
@@ -393,12 +368,6 @@ int BuildAcorn(const Config& c) {
   return 0;
 }
 
-// ------------------------------------------------------------- the audit --
-
-// +1 audit for the frozen ACORN configuration (docs/phase4_matrix.md V5):
-// a prefix of the base, built twice single-threaded (counting store and
-// standard), filters of every Phase 4 selectivity from a random attribute,
-// every budget.
 int AuditAcorn(const Config& c) {
   const fse::FloatMatrix base = fse::ReadFvecs(c.base_path, c.audit_base);
   const fse::FloatMatrix queries =
@@ -466,8 +435,6 @@ int AuditAcorn(const Config& c) {
   return ok ? 0 : 1;
 }
 
-// ------------------------------------------------------------- the sweep --
-
 struct Row {
   std::size_t budget = 0;
   std::size_t query = 0;
@@ -483,11 +450,10 @@ struct Row {
   std::size_t violations = 0;
   std::size_t mismatches = 0;
   bool tie = false;
-  std::uint64_t n_scanned = 0;  // ACORN neighbour entries scanned; 0 = n/a
-  std::int64_t seed0 = -1;      // ACORN level-0 starting node; -1 = n/a
+  std::uint64_t n_scanned = 0;
+  std::int64_t seed0 = -1;
 };
 
-// Checks common to all methods against the condition's ground truth.
 void Score(const fse::FilteredSearchResult& r, const fse::FloatMatrix& base,
            const float* query, const std::vector<char>& mask,
            const fse::NeighborTable& gt, std::size_t q, std::size_t k,
@@ -507,14 +473,13 @@ void Score(const fse::FilteredSearchResult& r, const fse::FloatMatrix& base,
   }
 }
 
-// What every per-budget step of a sweep needs.
 struct SweepContext {
   const Config& c;
   const fse::FloatMatrix& base;
   const fse::FloatMatrix& queries;
   const fse::FilterCondition& f;
   const std::vector<std::size_t>& qids;
-  double s;  // exact global selectivity of the condition
+  double s;
 };
 
 void RunPrefilter(const SweepContext& x,
@@ -534,7 +499,6 @@ void RunPrefilter(const SweepContext& x,
   }
 }
 
-// Returns {queries replayed, replay mismatches} (V5 replay audit).
 std::pair<std::size_t, std::size_t> RunPostfilter(
     const SweepContext& x, fse::HnswIndex* post, std::size_t b,
     std::vector<fse::FilteredSearchResult>* res, std::vector<Row>* br) {
@@ -553,7 +517,7 @@ std::pair<std::size_t, std::size_t> RunPostfilter(
     (*br)[iu].dist_native = (*res)[iu].distance_computations;
     (*br)[iu].dist_exact = (*res)[iu].distance_computations;
   }
-  // Replay audit: a seeded subsample, rounds replayed directly.
+
   const auto perm = fse::SeededPermutation(x.qids.size(), x.c.replay_seed);
   const std::size_t m = std::min(x.c.replay_queries, x.qids.size());
   std::size_t bad = 0;
@@ -571,7 +535,6 @@ std::pair<std::size_t, std::size_t> RunPostfilter(
   return {m, bad};
 }
 
-// ACORN: single-threaded (its distance counter is a process-wide global).
 void RunAcorn(const SweepContext& x, fse::AcornIndex* acorn, std::size_t b,
               std::vector<fse::FilteredSearchResult>* res,
               std::vector<Row>* br) {
@@ -593,7 +556,6 @@ void RunAcorn(const SweepContext& x, fse::AcornIndex* acorn, std::size_t b,
   }
 }
 
-// Score every query of one budget, append its rows, keep the raw results.
 void CollectBudget(const SweepContext& x, const fse::NeighborTable& gt,
                    std::size_t b,
                    const std::vector<fse::FilteredSearchResult>& res,
@@ -659,7 +621,7 @@ int Sweep(const Config& c, const std::string& method,
 
   std::vector<std::size_t> budgets = c.budgets;
   if (method == "prefilter") {
-    budgets = {0};  // budget-independent (exact)
+    budgets = {0};
   }
   std::vector<Row> rows;
   rows.reserve(budgets.size() * qids.size());
@@ -701,11 +663,13 @@ int Sweep(const Config& c, const std::string& method,
   for (const std::size_t b : budgets) {
     std::vector<Row> br(qids.size());
     std::vector<fse::FilteredSearchResult> res(qids.size());
+    // Budgets up to the first fetch size run exactly the same post-filter
+    // search, so we compute them once and reuse the result.
     const bool inert = c.post_reuse_inert && b <= first_fetch;
     if (method == "prefilter") {
       RunPrefilter(ctx, &res, &br);
     } else if (method == "postfilter" && inert && !inert_res.empty()) {
-      res = inert_res;  // identical computation (see post_reuse_inert)
+      res = inert_res;
       br = inert_br;
       reused += (reused.empty() ? "" : " ") + std::to_string(b);
     } else if (method == "postfilter") {
@@ -761,10 +725,6 @@ int Sweep(const Config& c, const std::string& method,
   return 0;
 }
 
-// ------------------------------------------------------------ timing pass --
-
-// Single process, single thread: seeded query subsample, every condition,
-// method and budget; 1 warm-up + `repeats` timed repetitions, median.
 int Timing(const Config& c) {
   const fse::FloatMatrix base = fse::ReadFvecs(c.base_path);
   const fse::FloatMatrix queries = fse::ReadFvecs(c.query_path);
@@ -783,7 +743,7 @@ int Timing(const Config& c) {
   std::ofstream csv(c.output_dir + "/timing.csv");
   csv << "condition,method,budget,query_id,median_us\n";
   auto time_one = [&](auto&& fn) {
-    fn();  // warm-up, discarded
+    fn();
     std::vector<double> t;
     for (int r = 0; r < c.timing_repeats; ++r) {
       const double t0 = Now();
@@ -829,9 +789,6 @@ int Timing(const Config& c) {
   return 0;
 }
 
-// ------------------------------------------------- controlled ACORN audit --
-
-// First line of /proc/loadavg (1, 5, 15 min, runnable/total, last pid).
 std::string LoadAvg() {
   std::ifstream in("/proc/loadavg");
   std::string line;
@@ -839,7 +796,6 @@ std::string LoadAvg() {
   return line;
 }
 
-// "Threads:" from /proc/self/status (OS threads of this process).
 int ProcessThreads() {
   std::ifstream in("/proc/self/status");
   std::string line;
@@ -851,7 +807,6 @@ int ProcessThreads() {
   return -1;
 }
 
-// Pins the whole process to one core; returns the affinity read back.
 std::string PinToCore(int core) {
   cpu_set_t set;
   CPU_ZERO(&set);
@@ -884,14 +839,10 @@ bool SameResult(const fse::AcornQueryResult& a,
 
 struct AuditCounts {
   std::size_t rows = 0;
-  std::size_t repeat_mismatches = 0;  // timed call != warm-up call
-  std::size_t off_core = 0;           // sched_getcpu() != pinned core
+  std::size_t repeat_mismatches = 0;
+  std::size_t off_core = 0;
 };
 
-// One (condition, budget) block: per query 1 warm-up + `repeats` timed
-// calls, each repeat written as its own row. The timer is the existing one
-// inside AcornIndex::SearchOne (as in the matrix sweeps, latency_us); the
-// stage's own outer timer around the call is recorded as outer_us.
 void AuditBlock(const Config& c, fse::AcornIndex* acorn,
                 const fse::FloatMatrix& queries, const fse::FilterCondition& f,
                 const fse::NeighborTable& gt, std::size_t b,
@@ -923,10 +874,6 @@ void AuditBlock(const Config& c, fse::AcornIndex* acorn,
   }
 }
 
-// Controlled ACORN-only timing audit (docs/phase4_matrix.md §13): one
-// process pinned to one core, one thread, the frozen 500-query timing
-// subsample, every (condition, budget) block in an order interleaved by the
-// frozen timing seed. Search code, parameters and counters are unchanged.
 int TimingAcornAudit(const Config& c) {
   if (c.timing_pin_core < 0) {
     throw std::invalid_argument("acorn_audit requires timing.pin_core");
@@ -1020,7 +967,7 @@ int TimingAcornAudit(const Config& c) {
   return n.repeat_mismatches == 0 && n.off_core == 0 ? 0 : 1;
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc < 3) {

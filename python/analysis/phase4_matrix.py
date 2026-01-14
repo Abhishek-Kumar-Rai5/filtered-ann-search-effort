@@ -1,12 +1,8 @@
-"""Phase 4: oracle effort and the frozen V1-V11 validation of the matrix.
-
-Implements docs/phase4_matrix.md sections 1.6 (oracle) and 3.2 (V1-V11) on
-the raw per-query outputs of `fse_matrix sweep`. Nothing here changes a
-criterion; every threshold is the frozen one passed in from main().
+"""Work out the oracle effort for the Phase 4 matrix and run its validation checks.
 
 Usage:
   python python/analysis/phase4_matrix.py --matrix results/phase4/matrix \
-      --rerun results/phase4/rerun --audit results/phase4/audit_acorn.json \
+      --rerun results/phase4/rerun --audit results/phase4/matrix/audit_acorn.json \
       [--nscan results/phase4/nscan] --out results/phase4/analysis
 """
 
@@ -22,18 +18,13 @@ import pandas as pd
 
 METHODS = ("prefilter", "postfilter", "acorn")
 GRAPH_METHODS = ("postfilter", "acorn")
-# Columns that must be identical between runs / identical labels (all but
-# latency and the condition labels themselves).
 RESULT_COLS = ["query_id", "budget", "effective_list", "recall", "dist_exact",
                "dist_native", "filter_checks", "rounds", "last_fetch",
                "n_valid", "filter_violations", "distance_mismatches",
                "gt_tie_at_k"]
 
 
-# ------------------------------------------------------------------ input --
-
 def read_neighbor_table(path: Path):
-    """fse::WriteNeighborTable format: u64 nq, u64 k, int64 ids, float32 d."""
     raw = path.read_bytes()
     nq, k = np.frombuffer(raw[:16], dtype=np.uint64)
     nq, k = int(nq), int(k)
@@ -54,10 +45,7 @@ def load_sweeps(matrix_dir: Path) -> list[dict]:
             for p in sorted(matrix_dir.glob("*/*/sweep.json"))]
 
 
-# ----------------------------------------------------------------- checks --
-
 def check_completeness(df: pd.DataFrame, conditions, budgets, n_queries):
-    """V1: every (condition, method, budget, query) exactly once, finite."""
     expected = len(conditions) * n_queries * (1 + 2 * len(budgets))
     key = ["condition", "method", "budget", "query_id"]
     dup = int(df.duplicated(key).sum())
@@ -80,7 +68,6 @@ def check_completeness(df: pd.DataFrame, conditions, budgets, n_queries):
 
 
 def check_filter(df: pd.DataFrame):
-    """V4: zero filter violations and zero distance mismatches."""
     v = int(df.filter_violations.sum())
     m = int(df.distance_mismatches.sum())
     return {"filter_violations": v, "distance_mismatches": m,
@@ -88,7 +75,6 @@ def check_filter(df: pd.DataFrame):
 
 
 def check_accounting(df: pd.DataFrame, thresholds: dict):
-    """V5 (row part): pre-filter = T(s); ACORN = native + 1; post exact."""
     pre = df[df.method == "prefilter"]
     pre_bad = int((pre.dist_exact != pre.condition.map(thresholds)).sum())
     ac = df[df.method == "acorn"]
@@ -101,8 +87,6 @@ def check_accounting(df: pd.DataFrame, thresholds: dict):
 
 
 def check_monotone(df: pd.DataFrame, recall_tol: float = 0.002):
-    """V6: mean recall and mean dist_exact non-decreasing along the budget
-    grid for each graph method and condition; pre-filter recall == 1."""
     failures = []
     g = (df[df.method.isin(GRAPH_METHODS)]
          .groupby(["method", "condition", "budget"])[["recall", "dist_exact"]]
@@ -122,8 +106,6 @@ def check_monotone(df: pd.DataFrame, recall_tol: float = 0.002):
 
 def check_s1_identity(df: pd.DataFrame, s1_random: str, s1_clustered: str,
                       matrix_dir: Path | None = None):
-    """V7: at s = 1 both correlation labels have the same mask, so every
-    per-query result (except latency) and every raw file must be equal."""
     a = df[df.condition == s1_random].sort_values(["method", "budget", "query_id"])
     b = df[df.condition == s1_clustered].sort_values(["method", "budget", "query_id"])
     cols = ["method"] + RESULT_COLS
@@ -142,7 +124,6 @@ def check_s1_identity(df: pd.DataFrame, s1_random: str, s1_clustered: str,
 
 
 def check_inert(df: pd.DataFrame, k: int, matrix_dir: Path | None = None):
-    """V8: post-filter results are identical for all budgets b <= ceil(k/s)."""
     failures = []
     po = df[df.method == "postfilter"]
     cols = ["recall", "dist_exact", "filter_checks", "rounds", "last_fetch",
@@ -168,9 +149,6 @@ def check_inert(df: pd.DataFrame, k: int, matrix_dir: Path | None = None):
 
 
 def compute_oracle(df: pd.DataFrame, target: float = 0.9) -> pd.DataFrame:
-    """Oracle (section 1.6): smallest budget with recall >= target; its
-    exact distance computations. Censored (not reached within the grid):
-    oracle_budget = NaN, oracle_dist = +inf. Pre-filter: its fixed effort."""
     out = []
     for (method, cond), sub in df.groupby(["method", "condition"]):
         s = float(sub.s_achieved.iloc[0])
@@ -192,9 +170,6 @@ def compute_oracle(df: pd.DataFrame, target: float = 0.9) -> pd.DataFrame:
 
 
 def check_v10(oracle: pd.DataFrame, s_low: float, s_high: float):
-    """V10 (design checkpoint): for each graph method and correlation, the
-    median oracle effort over all queries (censored = +inf) at the lowest
-    selectivity is strictly greater than at s = 1."""
     results = []
     for method in GRAPH_METHODS:
         for corr in sorted(oracle.correlation.unique()):
@@ -210,12 +185,7 @@ def check_v10(oracle: pd.DataFrame, s_low: float, s_high: float):
     return {"cells": results, "pass": all(r["pass"] for r in results)}
 
 
-# ---------------------------------------- revised V10 (section 16, post hoc) --
-
 def join_scan(df: pd.DataFrame, scan: pd.DataFrame):
-    """Attach ACORN n_scanned (results/phase4/nscan rows) to the matrix rows
-    by (condition, budget, query). The nscan rows must reproduce the matrix's
-    D and recall exactly; existing columns are never modified."""
     key = ["condition", "budget", "query_id"]
     acorn = df[df.method == "acorn"]
     s = scan[key + ["n_scanned", "dist_exact", "dist_native", "recall"]]
@@ -239,10 +209,8 @@ def join_scan(df: pd.DataFrame, scan: pd.DataFrame):
 
 
 def oracle_scan(oracle: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
-    """F = n_scanned at each ACORN query's oracle budget (censored = +inf);
-    NaN for the other methods. oracle_budget and oracle_dist are unchanged."""
     a = df[df.method == "acorn"][["condition", "budget", "query_id", "n_scanned"]]
-    a = a.astype({"budget": float})  # oracle_budget is float (NaN = censored)
+    a = a.astype({"budget": float})
     o = oracle.merge(a.rename(columns={"budget": "oracle_budget",
                                        "n_scanned": "oracle_scan"})
                      .assign(method="acorn"),
@@ -254,16 +222,10 @@ def oracle_scan(oracle: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
 
 
 def not_dominated(d_lo: float, d_hi: float, f_lo: float, f_hi: float) -> bool:
-    """ACORN revised V10 cell: fails only if D(low s) <= D(s=1) AND
-    F(low s) <= F(s=1)."""
     return not (d_lo <= d_hi and f_lo <= f_hi)
 
 
 def check_v10_revised(oracle: pd.DataFrame, s_low: float, s_high: float):
-    """Revised V10 (docs/phase4_matrix.md section 16; post-hoc revision, the
-    original V10 stays reported). Medians over all queries at each query's
-    oracle budget, censored = +inf. Post-filter: D(low) > D(1). ACORN: the
-    pair (D, F) at low s must not be dominated by (D, F) at s = 1."""
     results = []
     for method in GRAPH_METHODS:
         for corr in sorted(oracle.correlation.unique()):
@@ -290,7 +252,6 @@ def check_v10_revised(oracle: pd.DataFrame, s_low: float, s_high: float):
 def check_determinism(main: pd.DataFrame, rerun: pd.DataFrame,
                       main_dir: Path | None = None,
                       rerun_dir: Path | None = None):
-    """V9: re-run subset identical to the main run (except latency)."""
     key = ["condition", "method", "budget", "query_id"]
     cols = key + [c for c in RESULT_COLS if c not in key]
     m = main.merge(rerun[key], on=key)[cols].sort_values(key)
@@ -319,7 +280,6 @@ def check_determinism(main: pd.DataFrame, rerun: pd.DataFrame,
 
 
 def aggregates(df: pd.DataFrame, target: float = 0.9) -> pd.DataFrame:
-    """Reported, not gated: per (method, condition, budget)."""
     g = df.groupby(["method", "condition", "correlation", "s_achieved",
                     "budget"])
     a = g.agg(mean_recall=("recall", "mean"),
@@ -331,8 +291,6 @@ def aggregates(df: pd.DataFrame, target: float = 0.9) -> pd.DataFrame:
     a["failed_fraction"] = failed.to_numpy()
     return a
 
-
-# ------------------------------------------------------------------- main --
 
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
@@ -360,8 +318,6 @@ def main() -> None:
     qh = {s["query_hash"] for s in sweeps}
     v["V2_same_query_set"] = {"query_hashes": sorted(qh),
                               "pass": len(qh) == 1}
-    # V3 is enforced at load time by fse_matrix (verified store); a sweep
-    # only exists if its ground-truth identity matched.
     v["V3_ground_truth_identity"] = {
         "sweeps": len(sweeps),
         "conditions_with_identity": sorted({s["condition"] for s in sweeps}),
@@ -402,7 +358,6 @@ def main() -> None:
         revised = check_v10_revised(oracle, s_vals[0], s_vals[-1])
         revised["scan_join"] = scan_integrity
         revised["pass"] = revised["pass"] and scan_integrity["pass"]
-    # V11 (tests, clang-tidy, file integrity) is run and recorded separately.
     args.out.mkdir(parents=True, exist_ok=True)
     oracle.to_csv(args.out / "oracle.csv.gz", index=False)
     agg = aggregates(df, args.target)
@@ -422,8 +377,6 @@ def main() -> None:
     report = {"checks": v, "summary": summary,
               "all_pass_V1_V10": all(x["pass"] for x in v.values())}
     if revised is not None:
-        # Original V10 stays in "checks"/"all_pass_V1_V10"; the revision is
-        # reported beside it (docs/phase4_matrix.md section 16).
         report["V10_revised"] = revised
         report["all_pass_V1_V9_V10_revised"] = revised["pass"] and all(
             x["pass"] for k2, x in v.items() if k2 != "V10_design_checkpoint")

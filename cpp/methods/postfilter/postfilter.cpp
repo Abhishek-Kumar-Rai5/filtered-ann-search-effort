@@ -30,8 +30,7 @@ FilteredSearchResult PostfilterSearch(const HnswIndex& index,
   if (k == 0) {
     throw std::invalid_argument("PostfilterSearch: k must be > 0");
   }
-  // growth_factor must exceed 1 when refetching, or rounds would repeat the
-  // identical search.
+
   if (params.max_rounds == 0 || params.overfetch_factor <= 0.0 ||
       params.growth_factor < 1.0 ||
       (params.max_rounds > 1 && params.growth_factor <= 1.0)) {
@@ -48,7 +47,7 @@ FilteredSearchResult PostfilterSearch(const HnswIndex& index,
   r.ids.assign(k, -1);
   r.distances.assign(k, std::numeric_limits<float>::infinity());
   if (global_selectivity == 0.0) {
-    return r;  // nothing passes; no search needed
+    return r;
   }
 
   const std::size_t n = index.Size();
@@ -60,9 +59,6 @@ FilteredSearchResult PostfilterSearch(const HnswIndex& index,
     r.rounds = round;
     r.last_fetch = fetch;
 
-    // Candidates arrive in ascending distance; keep the first k survivors.
-    // Each round re-searches from scratch, so survivors are rebuilt; the
-    // last round's (possibly partial) survivors are what is returned.
     std::fill(r.ids.begin(), r.ids.end(), -1);
     std::fill(r.distances.begin(), r.distances.end(),
               std::numeric_limits<float>::infinity());
@@ -76,10 +72,10 @@ FilteredSearchResult PostfilterSearch(const HnswIndex& index,
       }
     }
     if (kept == k || fetch >= n) {
-      break;  // enough survivors, or nothing more to fetch
+      break;
     }
   }
   return r;
 }
 
-}  // namespace fse
+}

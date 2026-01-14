@@ -1,17 +1,5 @@
-// Structural study: controlled predicate fragmentation conditions
-// (docs/structural_design.md §3.3 items 3-4, §5 V-S5).
-//
+// Builds the fragmented filter conditions and their exact ground truth.
 // Usage: fse_fragment_conditions <config.yaml>
-//
-// For every fragmentation level (clustered with k-means C clusters, or
-// random) and every realization, builds the rank attribute with the frozen
-// Phase 3 generator (unchanged): clustered levels use ONE k-means seed per C
-// (fixed partition) and realizations differ only in the cluster-order seed;
-// random realizations differ in the permutation seed. For every selectivity
-// it writes the exact filtered ground truth into the verified store and a
-// manifest recording every hash. Checks: exact T, nested levels within a
-// realization, fixed partition per C, distinct realizations, and optional
-// expected attribute hashes (Phase 4 reproduction).
 
 #include <yaml-cpp/yaml.h>
 
@@ -39,7 +27,7 @@ namespace {
 struct Level {
   std::string name;
   bool random = false;
-  fse::ClusteredParams clustered;  // num_clusters, kmeans seed/iter, cap
+  fse::ClusteredParams clustered;
 };
 
 struct Config {
@@ -51,9 +39,9 @@ struct Config {
   std::size_t gt_k = 0;
   std::vector<double> selectivities;
   std::vector<Level> levels;
-  std::vector<std::uint64_t> order_seeds;              // clustered realizations
-  std::vector<std::uint64_t> random_seeds;             // random realizations
-  std::map<std::string, std::uint64_t> expected_hash;  // "<level>_r<i>"
+  std::vector<std::uint64_t> order_seeds;
+  std::vector<std::uint64_t> random_seeds;
+  std::map<std::string, std::uint64_t> expected_hash;
   std::string cache_dir;
   std::string output_dir;
 };
@@ -124,8 +112,8 @@ struct Entry {
   std::string attribute_path;
   std::uint64_t attribute_hash = 0;
   fse::FilterCondition f;
-  std::size_t passing_clusters = 0;  // distinct clusters touched (designed)
-  std::size_t partial_clusters = 0;  // clusters only partly passing
+  std::size_t passing_clusters = 0;
+  std::size_t partial_clusters = 0;
   std::string gt_path;
 };
 
@@ -192,8 +180,6 @@ struct Inputs {
   std::uint64_t query_hash = 0;
 };
 
-// Attribute of one realization of a level; enforces the fixed partition per
-// C, distinct realizations and expected (Phase 4) hashes.
 fse::RankAttribute BuildAttribute(const Inputs& in, const Level& lv,
                                   std::size_t r, std::uint64_t seed,
                                   std::vector<std::int32_t>* partition,
@@ -230,8 +216,6 @@ fse::RankAttribute BuildAttribute(const Inputs& in, const Level& lv,
   return a;
 }
 
-// One condition: exact T, nesting against the previous level, cluster
-// counts, verified ground truth.
 Entry MakeEntry(const Inputs& in, const Level& lv, std::size_t r,
                 std::uint64_t seed, const fse::RankAttribute& a,
                 const std::string& attr_path, double s,
@@ -332,7 +316,7 @@ int Run(const Config& c) {
   return 0;
 }
 
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc != 2) {

@@ -1,4 +1,3 @@
-# Decision experiment: L = U + N on realization 0 of C100/C1000/random.
 experiment_name: structural_decision_decomposition
 manifest: results/structural/pilot/decision/manifest_r0.yaml
 k: 10

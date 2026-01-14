@@ -1,4 +1,3 @@
-# Fragmentation pilot: L = U + N for ACORN-γ and ACORN-1 at s = 0.01.
 experiment_name: structural_pilot_decomposition
 manifest: results/structural/pilot/conditions/manifest.yaml
 k: 10

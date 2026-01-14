@@ -41,7 +41,7 @@ double ExactHomophily(const NeighborTable& base_knn,
     for (std::size_t j = 0; j < base_knn.k && seen < k; ++j) {
       const std::int64_t id = base_knn.Ids(i)[j];
       if (id == static_cast<std::int64_t>(i)) {
-        continue;  // self
+        continue;
       }
       ++seen;
       pass += mask[static_cast<std::size_t>(id)] != 0 ? 1 : 0;
@@ -104,4 +104,4 @@ double EmpiricalPLower(const std::vector<double>& null, double observed) {
   return static_cast<double>(1 + le) / static_cast<double>(null.size() + 1);
 }
 
-}  // namespace fse
+}

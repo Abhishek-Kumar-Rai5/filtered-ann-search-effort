@@ -1,5 +1,3 @@
-"""Tests for the Phase 5 predictor library (docs/phase5_predictor.md)."""
-
 import sys
 from pathlib import Path
 
@@ -41,13 +39,12 @@ def test_leakage_guard_rejects_post_hoc_features():
 def test_decide_cheapest_budget_meeting_tau_with_fallback():
     p = np.maximum.accumulate(np.array([[0.1, 0.5, 0.9], [0.0, 0.2, 0.3],
                                         [0.95, 0.4, 0.99]]), axis=1)
-    assert p[2, 1] == 0.95  # cumulative max
-    assert L.decide(p, 0.5).tolist() == [1, 2, 0]   # row 2 falls back to last
+    assert p[2, 1] == 0.95
+    assert L.decide(p, 0.5).tolist() == [1, 2, 0]
     assert L.decide(p, 0.0).tolist() == [0, 0, 0]
 
 
 def test_calibrate_tau_picks_cheapest_feasible_threshold():
-    # two pairs; budget 1 needed for success on pair 0 only
     succ = np.array([[0, 1], [1, 1]], bool)
     D = np.array([[10.0, 100.0], [10.0, 100.0]])
     p = np.array([[0.3, 1.0], [0.8, 1.0]])
@@ -55,14 +52,12 @@ def test_calibrate_tau_picks_cheapest_feasible_threshold():
     assert feas and sr == 1.0 and cost == 55.0 and 0.3 < tau <= 0.8
     tau, sr, cost, feas = L.calibrate_tau(p, succ, D, np.zeros(2), 0.5, 0.1)
     assert cost == 10.0 and sr == 0.5
-    # unreachable target -> fallback to the largest budget
     succ2 = np.array([[0, 0], [1, 1]], bool)
     tau, sr, cost, feas = L.calibrate_tau(p, succ2, D, np.zeros(2), 1.0, 0.1)
     assert not feas and np.isinf(tau) and cost == 100.0
 
 
 def test_calibrate_b1_minimal_mix_identical_across_conditions():
-    # 4 queries x 2 conditions; budget 0 succeeds for half the pairs
     q = np.repeat(np.arange(4), 2)
     succ = np.array([[1, 1], [1, 1], [0, 1], [0, 1],
                      [1, 1], [0, 1], [0, 1], [1, 1]], bool)
@@ -71,9 +66,7 @@ def test_calibrate_b1_minimal_mix_identical_across_conditions():
     b = L.calibrate_b1(succ, D, q, u, 0.75)
     assert (b["lo"], b["hi"]) == (0, 1) and b["success"] >= 0.75
     idx = L.b1_assign(q, u, b)
-    # a query gets the same budget in every condition
     assert all(len(set(idx[q == k])) == 1 for k in range(4))
-    # minimal: query 0 (u=0.1) alone gains nothing, query 1 gains 2 pairs
     assert b["lam"] == 0.6 and idx.tolist() == [1, 1, 1, 1, 0, 0, 0, 0]
     assert L.calibrate_b1(succ, D, q, u, 0.5)["hi"] == 0
 
@@ -81,8 +74,8 @@ def test_calibrate_b1_minimal_mix_identical_across_conditions():
 def test_regret_decomposition_and_per_pair_regret_with_censoring():
     succ = np.array([[0, 1, 1], [0, 0, 1], [0, 0, 0], [1, 1, 1]], bool)
     D = np.array([[1.0, 2, 4], [1, 2, 4], [1, 2, 4], [1, 2, 4]])
-    oracle = np.array([1, 2, -1, 0])          # pair 2 censored
-    idx = np.array([2, 1, 2, 0])              # overspend, avoidable fail, cens, exact
+    oracle = np.array([1, 2, -1, 0])
+    idx = np.array([2, 1, 2, 0])
     probe = np.full(4, 1.0)
     r = L.regret_decomposition(idx, succ, D, probe, oracle)
     assert r["censored"] == 1 and r["success_rate"] == 0.5
@@ -113,13 +106,12 @@ def test_gate_stats_and_gate_rule():
     res = L.gate_pass(g2, gate)
     assert res["saving_criterion"] and not res["success_criterion"] and not res["pass"]
     g3 = L.gate_stats(cost_b * 0.95, cost_b, ok, ok, q, np.random.default_rng(1), 300, 0.95)
-    assert not L.gate_pass(g3, gate)["pass"]  # 5 % < 10 %
+    assert not L.gate_pass(g3, gate)["pass"]
 
 
 def test_router_learns_a_separable_budget_rule():
     rng = np.random.default_rng(0)
     x = rng.random((600, 1))
-    # easy queries (x < 0.5) succeed at budget 0, others need budget 1
     succ = np.column_stack([x[:, 0] < 0.5, np.ones(600, bool)])
     for fam in L.FAMILIES:
         p = L.predict_monotone(L.fit_budget_models(x, succ, fam, CFG), x)

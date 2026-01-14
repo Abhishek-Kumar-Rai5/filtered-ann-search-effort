@@ -1,5 +1,3 @@
-// Phase 3 check-2 statistics (docs/phase3_filter_generator.md section 9).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -12,22 +10,20 @@
 namespace {
 
 TEST(StructureStats, ZeroFractionCountsQueriesWithNoPassingNeighbour) {
-  // 3 queries x 3 neighbours.
   const fse::NeighborTable t{
       3, 3, {0, 1, 2, 3, 4, 5, 1, 3, 5}, std::vector<float>(9, 0.0F)};
   const std::vector<char> mask = {0, 0, 1, 0, 0, 0};
-  EXPECT_DOUBLE_EQ(fse::ZeroFraction(t, mask, 3), 2.0 / 3.0);  // q1, q2
-  EXPECT_DOUBLE_EQ(fse::ZeroFraction(t, mask, 2), 1.0);  // id 2 is 3rd for q0
+  EXPECT_DOUBLE_EQ(fse::ZeroFraction(t, mask, 3), 2.0 / 3.0);
+  EXPECT_DOUBLE_EQ(fse::ZeroFraction(t, mask, 2), 1.0);
   EXPECT_THROW(fse::ZeroFraction(t, mask, 4), std::invalid_argument);
   EXPECT_THROW(fse::ZeroFraction(t, mask, 0), std::invalid_argument);
 }
 
 TEST(StructureStats, ExactHomophilyExcludesSelfAndAveragesPassingOnly) {
-  // 4 base vectors, rows = own neighbour lists (self first), k + 1 = 3.
   const fse::NeighborTable knn{
       4, 3, {0, 1, 2, 1, 0, 3, 2, 3, 0, 3, 2, 1}, std::vector<float>(12, 0.0F)};
   const std::vector<char> mask = {1, 1, 0, 0};
-  // vector 0: neighbours 1, 2 -> 1/2 pass; vector 1: 0, 3 -> 1/2 pass.
+
   EXPECT_DOUBLE_EQ(fse::ExactHomophily(knn, mask, 2), 0.5);
   EXPECT_DOUBLE_EQ(fse::ExactHomophily(knn, {0, 0, 0, 0}, 2), 0.0);
   EXPECT_DOUBLE_EQ(fse::ExactHomophily(knn, {1, 1, 1, 1}, 2), 1.0);
@@ -59,12 +55,11 @@ TEST(StructureStats, SampledHomophilyOverAllVectorsEqualsExact) {
   const std::vector<std::int32_t> all = {0, 1, 2, 3};
   EXPECT_DOUBLE_EQ(fse::SampledHomophily(knn, all, mask, 2),
                    fse::ExactHomophily(knn, mask, 2));
-  // A sample (rows 1 and 3 only): vector 1 -> {0: pass, 3: pass} = 1;
-  // vector 3 -> {2: fail, 1: pass} = 0.5.
+
   const fse::NeighborTable sub{
       2, 3, {1, 0, 3, 3, 2, 1}, std::vector<float>(6, 0.0F)};
   EXPECT_DOUBLE_EQ(fse::SampledHomophily(sub, {1, 3}, mask, 2), 0.75);
   EXPECT_THROW(fse::SampledHomophily(sub, {1}, mask, 2), std::invalid_argument);
 }
 
-}  // namespace
+}

@@ -1,6 +1,3 @@
-// Prints this build's metadata as YAML -- the same fields every experiment
-// run logs. Phase 0 sanity check that the toolchain and dependencies link.
-
 #include <iostream>
 
 #include "common/build_info.h"

@@ -1,27 +1,12 @@
-"""Build the condition manifests of the reported structural runs.
+"""Rebuild the condition lists used by the structural runs.
 
-During the original runs these manifests were assembled ad hoc; this script
-reproduces them from generator output (condition ids and mask hashes are
-copied, never recomputed, and every downstream driver re-verifies them).
-
-  decision  <pilot manifest> -> results/structural/pilot/decision/manifest.yaml
-            (+ manifest_r0.yaml): C100 r0-r4, C1000 r0-r4, random r0-r1 at
-            s = 0.01, selected from the output of
-            fse_fragment_conditions configs/structural/conditions_pilot.yaml
-  slice     <decision manifest> -> results/structural/slice/manifest.yaml:
-            C1000 r0 and random r0 under their Phase 4 names
-            (clustered_s0.0100, random_s0.0100) with the Phase 4 attribute and
-            ground-truth files (identical masks: same seeds, verified hashes).
-
-The committed decision manifest points random r0/r1 at the earlier MVP
-cache (data/cache/structural); a rebuilt one points at the pilot cache. The
-attribute hashes, condition ids and mask hashes are identical.
+'decision' keeps C100 and C1000 (5 realizations each) and random (2) at
+s = 0.01 from the generator output; 'slice' maps C1000 r0 and random r0 back
+to their Phase 4 names. Hashes are copied, and every tool checks them again.
 
 Usage:
-  .venv/bin/python python/analysis/structural_manifests.py decision \
-      results/structural/pilot/conditions/manifest.yaml
-  .venv/bin/python python/analysis/structural_manifests.py slice \
-      results/structural/pilot/decision/manifest.yaml
+  .venv/bin/python python/analysis/structural_manifests.py decision results/structural/pilot/conditions/manifest.yaml
+  .venv/bin/python python/analysis/structural_manifests.py slice results/structural/pilot/decision/manifest.yaml
 """
 
 from __future__ import annotations

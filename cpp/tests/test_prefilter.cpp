@@ -1,7 +1,3 @@
-// Pre-filter baseline: exact brute force restricted to the filtered subset.
-// Checked against the filtered ground-truth reference and a naive
-// sort-everything reference, including exact distance ties.
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -34,7 +30,7 @@ fse::FloatMatrix Gaussian(std::size_t rows, std::size_t dim,
 fse::FloatMatrix SmallIntegers(std::size_t rows, std::size_t dim,
                                std::uint32_t seed) {
   std::mt19937 rng(seed);
-  std::uniform_int_distribution<int> u(0, 2);  // forces many exact ties
+  std::uniform_int_distribution<int> u(0, 2);
   fse::FloatMatrix m{std::vector<float>(rows * dim), rows, dim};
   for (float& x : m.data) {
     x = static_cast<float>(u(rng));
@@ -154,4 +150,4 @@ TEST(Prefilter, PadsWhenFewerThanKPassAndHandlesEmptyFilter) {
                std::invalid_argument);
 }
 
-}  // namespace
+}

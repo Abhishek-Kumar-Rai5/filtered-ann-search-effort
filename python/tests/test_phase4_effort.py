@@ -1,5 +1,3 @@
-"""Tests for the Phase 4 effort / H3 / preliminary-H2 statistics (§17)."""
-
 import importlib.util
 from pathlib import Path
 
@@ -21,7 +19,6 @@ def test_bootstrap_median_ci_is_seeded_and_brackets_median():
     assert a == b
     med, lo, hi = a
     assert med == 501 and lo <= med <= hi and hi - lo < 100
-    # censored (+inf) values are ranked, not dropped
     med2, _, _ = e.bootstrap_median_ci(np.array([1.0, np.inf, np.inf]),
                                        np.random.default_rng(1), 50, 0.95)
     assert np.isinf(med2)
@@ -44,7 +41,6 @@ def test_sign_test_counts_ties_and_infinite_values():
 
 def test_holm_matches_hand_computation():
     adj = e.holm([0.01, 0.04, 0.03, 0.5])
-    # sorted 0.01,0.03,0.04,0.5 -> 0.04, 0.09, max(0.09,0.08)=0.09, 0.5
     assert adj == pytest.approx([0.04, 0.09, 0.09, 0.5])
 
 
@@ -59,7 +55,6 @@ def test_cluster_bootstrap_spearman_paired_by_query():
     for q in range(200):
         dens = rng.random()
         for c, s in enumerate((0.1, 1.0)):
-            # effort driven by density only; s is uninformative noise here
             rows.append(dict(query_id=q, condition=f"c{c}", s_achieved=s,
                              rho10=dens, effort=10 - 5 * dens + 0.01 * c))
     f = pd.DataFrame(rows)

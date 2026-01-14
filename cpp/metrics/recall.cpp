@@ -26,4 +26,4 @@ double RecallAtK(const std::int64_t* returned, const std::int64_t* truth,
   return static_cast<double>(hits) / static_cast<double>(k);
 }
 
-}  // namespace fse
+}

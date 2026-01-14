@@ -1,5 +1,3 @@
-"""Tests for the Phase 4 oracle and V-checks (docs/phase4_matrix.md)."""
-
 import importlib.util
 from pathlib import Path
 
@@ -17,7 +15,6 @@ BUDGETS = [10, 20, 40]
 
 
 def frame(conds=("random_s0.1000", "clustered_s0.1000"), nq=3, s=0.1):
-    """A complete, clean synthetic matrix."""
     rows = []
     for cond in conds:
         corr = cond.split("_")[0]
@@ -94,7 +91,6 @@ def test_s1_identity():
 
 
 def test_inert_budgets():
-    # s = 0.4, k = 10 -> ceil(k/s) = 25: budgets 10 and 20 must be identical.
     df = frame(s=0.4)
     po = df.method == "postfilter"
     df.loc[po & (df.budget == 20), "recall"] = \
@@ -112,7 +108,6 @@ def test_oracle_first_budget_reaching_target_and_censoring():
     df = frame()
     o = m.compute_oracle(df, 0.9)
     acorn = o[(o.method == "acorn") & (o.condition == "random_s0.1000")]
-    # recall 0.8, 0.9, 1.0 along BUDGETS -> first reaching 0.9 is budget 20
     assert (acorn.oracle_budget == 20).all()
     assert list(acorn.oracle_dist) == [61.0, 62.0, 63.0]
     pre = o[o.method == "prefilter"]
@@ -137,7 +132,7 @@ def test_v10_compares_low_selectivity_against_s1():
 def test_determinism_check_on_subset():
     df = frame()
     sub = df[df.query_id.isin([0, 2])].copy()
-    sub["latency_us"] = 999.0  # latency is not compared
+    sub["latency_us"] = 999.0
     assert m.check_determinism(df, sub)["pass"]
     sub.loc[sub.index[0], "dist_exact"] += 1
     assert not m.check_determinism(df, sub)["pass"]
@@ -161,24 +156,21 @@ def test_aggregates_failed_fraction():
     assert row.failed_fraction == pytest.approx(0.0)
 
 
-# ---- revised V10 (docs/phase4_matrix.md section 16) ----------------------
-
 @pytest.mark.parametrize("d_lo,d_hi,f_lo,f_hi,expected", [
-    (100, 200, 900, 300, True),    # D decreases, F increases -> PASS
-    (100, 200, 200, 300, False),   # both decrease -> FAIL
-    (300, 200, 200, 300, True),    # D increases, F decreases -> PASS
-    (300, 200, 900, 300, True),    # both increase -> PASS
-    (200, 200, 300, 300, False),   # both equal: D<=, F<= -> FAIL
-    (200, 200, 301, 300, True),    # D equal, F greater -> PASS
-    (100, 200, 300, 300, False),   # D less, F equal -> FAIL
-    (201, 200, 300, 300, True),    # D greater, F equal -> PASS
+    (100, 200, 900, 300, True),
+    (100, 200, 200, 300, False),
+    (300, 200, 200, 300, True),
+    (300, 200, 900, 300, True),
+    (200, 200, 300, 300, False),
+    (200, 200, 301, 300, True),
+    (100, 200, 300, 300, False),
+    (201, 200, 300, 300, True),
 ])
 def test_not_dominated_rule(d_lo, d_hi, f_lo, f_hi, expected):
     assert m.not_dominated(d_lo, d_hi, f_lo, f_hi) is expected
 
 
 def oracle_frame(acorn_lo, acorn_hi, post_lo=(500.0,) * 3, post_hi=(100.0,) * 3):
-    """Oracle rows: acorn_* are lists of (D, F) per query (None = censored)."""
     rows = []
     for corr in ("random", "clustered"):
         for s, pairs in ((0.01, acorn_lo), (1.0, acorn_hi)):
@@ -217,12 +209,10 @@ def test_v10_revised_postfilter_keeps_strict_d_rule():
 
 
 def test_v10_revised_censored_counts_as_infinite():
-    # 2 of 3 low-s queries censored: medians D = F = +inf -> not dominated.
     o = oracle_frame([None, None, (1, 1)], [(200, 300)] * 3)
     r = m.check_v10_revised(o, 0.01, 1.0)
     acorn = [c for c in r["cells"] if c["method"] == "acorn"]
     assert all(np.isinf(c["median_F_low_s"]) for c in acorn) and r["pass"]
-    # censoring at s = 1 makes its medians +inf: low s (finite) is dominated.
     o2 = oracle_frame([(100, 900)] * 3, [None, None, (1, 1)])
     assert not m.check_v10_revised(o2, 0.01, 1.0)["pass"]
 

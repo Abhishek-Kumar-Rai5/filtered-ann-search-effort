@@ -1,16 +1,3 @@
-"""Phase 5 predictor library (docs/phase5_predictor.md).
-
-Pure functions: query split, per-budget success router (Project 1 design),
-tau calibration, the fixed-budget baseline B1, regret decomposition, gate
-statistics. Nothing here reads files. Model/threshold/baseline selection
-functions receive training arrays only; the runner (phase5.py) enforces that
-test outcomes are touched exactly once, in evaluation.
-
-Conventions: a "pair" is one (query, condition); budgets are the frozen grid
-B, indexed 0..len(B)-1; succ[pair, j] = Recall@10 >= 0.9 at budget j;
-D[pair, j] = exact distance computations at budget j.
-"""
-
 from __future__ import annotations
 
 import numpy as np
@@ -21,20 +8,16 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
 ALLOWED_FEATURES = {"s", "rho_hat", "centroid_dist", "score_concentration", "lid"}
-FAMILIES = ("lr", "tree2", "tree3", "tree4")  # simplest first (tie-break)
+FAMILIES = ("lr", "tree2", "tree3", "tree4")
 MASK64 = (1 << 64) - 1
 
 
-# ------------------------------------------------------------------ split --
-
 def query_split(n_queries: int, seed: int, n_train: int):
-    """Seeded permutation of query ids; first n_train = training."""
     perm = np.random.default_rng(seed).permutation(n_queries)
     return np.sort(perm[:n_train]), np.sort(perm[n_train:])
 
 
 def fold_of(queries: np.ndarray, folds: int, seed: int) -> dict:
-    """Grouped CV: every training query (with all its conditions) in one fold."""
     perm = np.random.default_rng(seed).permutation(np.sort(queries))
     return {int(q): i % folds for i, q in enumerate(perm)}
 
@@ -48,18 +31,14 @@ def splitmix64(x: int) -> int:
 
 
 def hash_unit(queries: np.ndarray, seed: int) -> np.ndarray:
-    """Deterministic per-query value in [0, 1) for the B1 mix assignment."""
     return np.array([splitmix64(int(q) ^ seed) / 2.0**64 for q in queries])
 
 
 def check_features(names) -> None:
-    """Leakage guard: only frozen live features may enter a model."""
     bad = set(names) - ALLOWED_FEATURES
     if bad:
         raise ValueError(f"non-live feature(s) in model input: {sorted(bad)}")
 
-
-# ----------------------------------------------------------------- router --
 
 def make_model(family: str, cfg: dict):
     if family == "lr":
@@ -72,7 +51,6 @@ def make_model(family: str, cfg: dict):
 
 
 class ConstantModel:
-    """A budget whose training labels are all one class."""
 
     def __init__(self, p: float):
         self.p = p
@@ -93,18 +71,15 @@ def fit_budget_models(x: np.ndarray, succ: np.ndarray, family: str, cfg: dict):
 
 
 def predict_monotone(models, x: np.ndarray) -> np.ndarray:
-    """P(success at budget j); made non-decreasing in j (cumulative max)."""
     p = np.column_stack([m.predict_proba(x)[:, 1] for m in models])
     return np.maximum.accumulate(p, axis=1)
 
 
 def decide(p: np.ndarray, tau: float) -> np.ndarray:
-    """Cheapest budget index with P >= tau; fallback = largest budget."""
     return np.minimum((p < tau).sum(axis=1), p.shape[1] - 1)
 
 
 def oof_probabilities(x, succ, query_of_pair, folds: dict, family: str, cfg: dict):
-    """Out-of-fold P on the training pairs (folds grouped by query)."""
     fold = np.array([folds[int(q)] for q in query_of_pair])
     p = np.empty(succ.shape, dtype=float)
     for f in np.unique(fold):
@@ -118,9 +93,6 @@ def pick(arr: np.ndarray, idx: np.ndarray) -> np.ndarray:
 
 
 def calibrate_tau(p, succ, D, probe_cost, s_star: float, step: float):
-    """Training-only: the tau whose decisions reach success >= s_star with the
-    lowest mean cost (probe included). Returns (tau, success, cost, feasible);
-    infeasible -> tau = +inf (always the largest budget)."""
     best = None
     for tau in np.round(np.arange(0.0, 1.0 + step / 2, step), 10):
         idx = decide(p, tau)
@@ -137,13 +109,7 @@ def calibrate_tau(p, succ, D, probe_cost, s_star: float, step: float):
     return best
 
 
-# --------------------------------------------------------------- baseline --
-
 def calibrate_b1(succ, D, query_of_pair, u_of_query: dict, s_star: float):
-    """Two-adjacent-budget mix, identical across conditions, calibrated to
-    pooled success >= s_star on the given (training) pairs. Queries with
-    hash value u < lam get the higher budget. Returns dict(lo, hi, lam,
-    success, cost, feasible)."""
     rates = succ.mean(axis=0)
     ok = np.nonzero(rates + 1e-12 >= s_star)[0]
     nb = succ.shape[1]
@@ -175,11 +141,7 @@ def b1_assign(query_of_pair, u_of_query: dict, b1: dict) -> np.ndarray:
     return np.where(u < b1["lam"], b1["hi"], b1["lo"])
 
 
-# ------------------------------------------------------------------ regret --
-
 def regret_decomposition(idx, succ, D, probe_cost, oracle_idx):
-    """Test pairs. Censored pairs (oracle_idx < 0) are unavoidable failures:
-    excluded from regret, included in success/cost totals."""
     ok = pick(succ, idx).astype(bool)
     cost = probe_cost + pick(D, idx)
     cens = oracle_idx < 0
@@ -199,8 +161,6 @@ def regret_decomposition(idx, succ, D, probe_cost, oracle_idx):
 
 
 def per_pair_regret(idx, succ, D, probe_cost, oracle_idx):
-    """log2(cost / D*) on successes; +inf on avoidable failures; NaN on
-    censored pairs (excluded)."""
     ok = pick(succ, idx).astype(bool)
     cost = probe_cost + pick(D, idx)
     r = np.full(len(idx), np.nan)
@@ -211,17 +171,12 @@ def per_pair_regret(idx, succ, D, probe_cost, oracle_idx):
     return r
 
 
-# -------------------------------------------------------------- statistics --
-
 def per_query_mean(values: np.ndarray, query_of_pair: np.ndarray):
     qs, inv = np.unique(query_of_pair, return_inverse=True)
     return qs, np.bincount(inv, weights=values) / np.bincount(inv)
 
 
 def gate_stats(cost_r, cost_b, ok_r, ok_b, query_of_pair, rng, resamples, ci):
-    """Paired query-cluster bootstrap of saving = 1 - mean(cost_r)/mean(cost_b)
-    and of dsuccess = success_r - success_b; Wilcoxon signed-rank on the
-    per-query mean cost difference."""
     qs, inv = np.unique(query_of_pair, return_inverse=True)
     cnt = np.bincount(inv)
     cr = np.bincount(inv, weights=cost_r)
@@ -260,9 +215,6 @@ def spearman(x, y) -> float:
 
 
 def cluster_bootstrap_spearman(y, preds: dict, groups, rng, resamples, ci):
-    """Spearman(y, each predictor) with a bootstrap that resamples groups
-    (queries) with replacement; groups may have unequal sizes. Also CIs of
-    |rho_a| - |rho_b| for each predictor pair."""
     y = np.asarray(y, float)
     gs, inv = np.unique(groups, return_inverse=True)
     members = np.split(np.argsort(inv, kind="stable"), np.cumsum(np.bincount(inv))[:-1])

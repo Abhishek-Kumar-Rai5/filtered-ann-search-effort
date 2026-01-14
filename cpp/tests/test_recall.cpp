@@ -1,5 +1,3 @@
-// Recall@k definition (ACORN paper section 3 / ACORN compute_recall).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -24,7 +22,7 @@ TEST(Recall, CountsIdOverlapRegardlessOfOrder) {
 TEST(Recall, PaddingNeverMatchesAndDuplicatesCountOnce) {
   EXPECT_DOUBLE_EQ(R({5, -1, -1, -1}, {5, 3, 9, 1}, 4), 0.25);
   EXPECT_DOUBLE_EQ(R({5, 5, 5, 5}, {5, 3, 9, 1}, 4), 0.25);
-  // Padding in the ground truth (fewer than k passing) is not matchable.
+
   EXPECT_DOUBLE_EQ(R({-1, -1}, {-1, -1}, 2), 0.0);
 }
 
@@ -34,9 +32,7 @@ TEST(Recall, OnlyFirstKOfEachListCount) {
 }
 
 TEST(Recall, IdBasedEquidistantSubstituteIsAMiss) {
-  // Pre-registered definition: id-based, like the paper. A returned id at the
-  // same distance as a missed ground-truth id still counts as a miss.
   EXPECT_DOUBLE_EQ(R({1, 2, 99}, {1, 2, 3}, 3), 2.0 / 3.0);
 }
 
-}  // namespace
+}

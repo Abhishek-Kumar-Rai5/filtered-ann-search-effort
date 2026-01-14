@@ -66,7 +66,7 @@ void WriteVecs(const std::string& path, const DenseMatrix<T>& m) {
   }
 }
 
-}  // namespace
+}
 
 FloatMatrix ReadFvecs(const std::string& path, std::size_t max_rows) {
   return ReadVecs<float>(path, max_rows);
@@ -81,4 +81,4 @@ void WriteIvecs(const std::string& path, const IdMatrix& m) {
   WriteVecs(path, m);
 }
 
-}  // namespace fse
+}

@@ -1,6 +1,3 @@
-# Analysis/plotting/predictor only (CLAUDE.md: Python is for training, stats,
-# plots, orchestration). Pinned to the same versions as Project 1
-# (ann_router_staleness) for portfolio consistency.
 matplotlib==3.11.2
 numpy==2.5.3
 pandas==3.0.6

@@ -1,15 +1,5 @@
-"""Structural decomposition L = U + N (docs/structural_design.md §2, §5).
-
-Usage:
-  .venv/bin/python python/analysis/decomposition.py configs/structural/decomposition_mvp.yaml
-
-Per (method, condition, budget, query), with T = the exact filtered top-k
-(verified ground-truth store, identity checked against the manifest):
-  L = 1 - Recall (id-based), U = |T \\ R| / k, N = |(T ∩ R) \\ Found| / k,
-R = Reach_m(P, q) under R_sem (primary); U is also reported under R_graph and
-R_cap (sensitivity). PRE: R = P (exact scan). POST: unfiltered HNSW graph.
-Validation V-S1..V-S4 is computed and written to validation.json.
-"""
+# Splits each query's recall loss into targets that are unreachable (U) and
+# targets that were reachable but missed at that budget (N).
 
 from __future__ import annotations
 
@@ -22,14 +12,10 @@ import pandas as pd
 import yaml
 
 GT_MAGIC_BYTES = 8
-GT_HEADER = 5  # condition_id, mask_hash, query_hash, nq, k (uint64)
+GT_HEADER = 5
 
-
-# ------------------------------------------------------------------- input --
 
 def read_gt(path: Path, condition_id: str, mask_hash: str):
-    """Verified store: magic + (cond id, mask hash, query hash, nq, k) + ids
-    (int64) + distances (float32). Identity checked against the manifest."""
     raw = path.read_bytes()
     h = np.frombuffer(raw[GT_MAGIC_BYTES:GT_MAGIC_BYTES + 8 * GT_HEADER], dtype=np.uint64)
     if f"{int(h[0]):016x}" != condition_id or f"{int(h[1]):016x}" != mask_hash:
@@ -41,24 +27,17 @@ def read_gt(path: Path, condition_id: str, mask_hash: str):
 
 
 def read_raw(path: Path) -> np.ndarray:
-    """fse::WriteNeighborTable: u64 nq, u64 k, int64 ids, float32 dists."""
     raw = path.read_bytes()
     nq, k = (int(x) for x in np.frombuffer(raw[:16], dtype=np.uint64))
     return np.frombuffer(raw[16:16 + 8 * nq * k], dtype=np.int64).reshape(nq, k)
 
 
 def bits_to_matrix(bits: np.ndarray, k: int) -> np.ndarray:
-    """reach.csv bit masks -> bool [nq, k] (bit i = target i reachable)."""
     b = np.asarray(bits, dtype=np.int64)[:, None]
     return ((b >> np.arange(k)) & 1).astype(bool)
 
 
-# ------------------------------------------------------------------- core --
-
 def decompose(targets: np.ndarray, found: np.ndarray, reach: np.ndarray):
-    """targets [nq, k] ids, found [nq, kf] ids (-1 padding), reach [nq, k]
-    bool. Returns dict of per-query L, U, N (fractions of k) and the count of
-    found targets outside reach (must be 0 for a sound reachability)."""
     k = targets.shape[1]
     hit = (targets[:, :, None] == found[:, None, :]).any(axis=2) & (targets >= 0)
     miss = ~hit
@@ -80,10 +59,7 @@ def bootstrap_mean_ci(x: np.ndarray, rng, resamples: int, ci: float):
     return float(x.mean()), float(lo), float(hi)
 
 
-# ------------------------------------------------------------- pipeline --
-
 def reach_methods(cfg: dict) -> list:
-    """fse_reach graphs used by the configured methods (PRE needs none)."""
     return sorted({m["reach"] for m in cfg["methods"].values() if m["reach"] != "pre"})
 
 

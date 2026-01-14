@@ -1,23 +1,7 @@
 #!/usr/bin/env bash
-# Reproduce the reported structural results (docs/structural_results.md):
-# vertical slice, decision experiment and PRE/POST baselines at s = 0.01,
-# then the summary and the final report.
-#
-# Prerequisites (earlier phases, see README "Reproducing"):
-#   - SIFT1M in data/sift/ (scripts/download_sift1m.sh)
-#   - ACORN instrumentation applied (patches/acorn_instrumentation.patch), build/
-#   - Phase 1 ACORN-1 index  data/cache/phase1/acorn_acorn_1_buildA.index
-#   - Phase 4 indexes, attributes, ground truth (data/cache/phase4/) and the
-#     Phase 4 matrix sweeps at s = 0.01 (results/phase4/matrix/{prefilter,
-#     postfilter,acorn}/{random,clustered}_s0.0100) -- configs/phase4/
-# Index hashes are verified by every driver.
-#
-# Runtime on the reference VM (16 vCPU AMD EPYC-Milan, 58 GB RAM): condition
-# generation ~1.5 h (k-means per realization), ACORN sweeps 10-20 min per
-# condition (single-threaded, run in parallel), reachability ~1 min per
-# condition and method, analysis a few minutes.
-#
-# Usage: scripts/reproduce_structural.sh     (run detached: nohup setsid ...)
+# Reruns the reported structural results end to end. It needs SIFT1M, the
+# ACORN patch applied, and the Phase 1 / Phase 4 indexes and s = 0.01 sweeps
+# already built (see the README).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BIN=./build/cpp
@@ -39,8 +23,6 @@ $BIN/fse_reach configs/structural/slice_reach.yaml acorn_1
 $PY python/analysis/decomposition.py configs/structural/slice_decomposition.yaml
 
 echo "$(ts) 3/6 decision experiment: realization-0 sweeps"
-# C100 r0: new sweeps. C1000 r0 and random r0 are the Phase 4 / slice
-# conditions (identical masks): their sweeps are reused via relative links.
 $BIN/fse_matrix configs/structural/decision_gamma.yaml sweep acorn C100_r0_s0.0100 &
 $BIN/fse_matrix configs/structural/decision_acorn1.yaml sweep acorn C100_r0_s0.0100 &
 wait

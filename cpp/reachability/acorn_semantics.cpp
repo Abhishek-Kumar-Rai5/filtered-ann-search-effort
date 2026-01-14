@@ -19,7 +19,6 @@ void Push(std::int32_t v, MarkSet* marks, std::vector<std::int32_t>* out) {
   }
 }
 
-// Passing entries of Γ(v) (R_sem 2-hop step).
 void PushPassing(const CsrGraph& g, const std::vector<char>& mask,
                  std::int32_t v, MarkSet* marks,
                  std::vector<std::int32_t>* out) {
@@ -32,16 +31,12 @@ void PushPassing(const CsrGraph& g, const std::vector<char>& mask,
   }
 }
 
-// State of one simulated level-0 scan (ACORN c259f11,
-// hybrid_search_from_candidates).
 struct CapState {
   std::size_t cap = 0;
   std::size_t num_found = 0;
   bool keep_expanding = true;
 };
 
-// The 2-hop expansion of v1 inside a scan: passing entries are counted,
-// unvisited ones added; stops (keep_expanding = false) at the 2M count.
 void CapExpand(const CsrGraph& g, const std::vector<char>& mask,
                std::int32_t v1, CapState* st, MarkSet* vis,
                std::vector<std::int32_t>* out) {
@@ -54,7 +49,7 @@ void CapExpand(const CsrGraph& g, const std::vector<char>& mask,
     }
     ++st->num_found;
     if (!vis->Mark(static_cast<std::size_t>(v2))) {
-      continue;  // already visited
+      continue;
     }
     out->push_back(v2);
     if (st->num_found >= st->cap) {
@@ -64,8 +59,6 @@ void CapExpand(const CsrGraph& g, const std::vector<char>& mask,
   }
 }
 
-// Exact simulation of one level-0 scan of Γ(u), starting from a visited set
-// {u} (R_cap).
 void CapScan(const CsrGraph& g, const std::vector<char>& mask, std::size_t u,
              const SemanticsParams& p, MarkSet* vis,
              std::vector<std::int32_t>* out) {
@@ -82,7 +75,7 @@ void CapScan(const CsrGraph& g, const std::vector<char>& mask, std::size_t u,
       vis->Mark(static_cast<std::size_t>(v1));
       out->push_back(v1);
       if (st.num_found >= st.cap) {
-        return;  // ACORN: keep_expanding = false; break
+        return;
       }
     }
     if ((j >= static_cast<std::size_t>(p.m_beta) && st.keep_expanding) ||
@@ -92,7 +85,7 @@ void CapScan(const CsrGraph& g, const std::vector<char>& mask, std::size_t u,
   }
 }
 
-}  // namespace
+}
 
 void Successors(const CsrGraph& g, const std::vector<char>& mask, std::size_t u,
                 const SemanticsParams& p, MarkSet* marks,
@@ -102,7 +95,7 @@ void Successors(const CsrGraph& g, const std::vector<char>& mask, std::size_t u,
   }
   out->clear();
   marks->NewRound();
-  marks->Mark(u);  // excludes u from its own successors / visited in a scan
+  marks->Mark(u);
   if (p.kind == Semantics::kCap) {
     CapScan(g, mask, u, p, marks, out);
     return;
@@ -119,4 +112,4 @@ void Successors(const CsrGraph& g, const std::vector<char>& mask, std::size_t u,
   }
 }
 
-}  // namespace fse
+}

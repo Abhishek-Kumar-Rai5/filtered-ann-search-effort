@@ -1,7 +1,3 @@
-// Project-side ACORN wrapper. ACORN itself is a black box; these tests check
-// only what the wrapper adds (attribute ownership, counters, I/O, stats) and
-// that filtered search respects the filter.
-
 #include <faiss/impl/ACORN.h>
 #include <gtest/gtest.h>
 #include <omp.h>
@@ -63,7 +59,7 @@ TEST(AcornIndex, BuildsWithDefaultEfConstructionAndStructure) {
   const fse::AcornIndex index = Build(f, 4);
   EXPECT_EQ(index.Size(), kN);
   EXPECT_EQ(index.Dim(), kDim);
-  EXPECT_EQ(index.EfConstruction(), 16 * 4);  // ACORN default M * gamma
+  EXPECT_EQ(index.EfConstruction(), 16 * 4);
   const auto nodes = index.NodesPerLevel();
   ASSERT_FALSE(nodes.empty());
   EXPECT_EQ(nodes[0], kN);
@@ -73,9 +69,9 @@ TEST(AcornIndex, BuildsWithDefaultEfConstructionAndStructure) {
   const auto deg = index.AverageOutDegreePerLevel();
   ASSERT_EQ(deg.size(), nodes.size());
   EXPECT_GT(deg[0], 0.0);
-  EXPECT_LE(deg[0], 32 + 1.5 * 16);  // level-0 slots: M_beta + 1.5 M
+  EXPECT_LE(deg[0], 32 + 1.5 * 16);
   for (std::size_t l = 1; l < deg.size(); ++l) {
-    EXPECT_LE(deg[l], 16.0 * 4);  // upper-level slots: M * gamma
+    EXPECT_LE(deg[l], 16.0 * 4);
   }
   EXPECT_GE(index.MemoryBytes(), kN * kDim * sizeof(float));
 }
@@ -104,8 +100,7 @@ TEST(AcornIndex, FilteredSearchRespectsFilterAndFindsNeighbours) {
     }
     recall += fse::RecallAtK(&ids[q * kK], gt.Ids(q), kK);
   }
-  // Sanity only (ACORN is not under test): a generous ef on 3K points
-  // should find almost all filtered neighbours.
+
   EXPECT_GT(recall / kNq, 0.9);
 }
 
@@ -133,9 +128,6 @@ TEST(AcornIndex, SearchOneMatchesBatchAndCounterSumsToBatchDelta) {
   EXPECT_EQ(ids, one_ids);
 }
 
-// n_scanned (project instrumentation in ACORN, docs/phase4_matrix.md §14):
-// deterministic per query, every counted distance is on a scanned entry, and
-// the multi-threaded batch reduction equals the per-query sum.
 TEST(AcornIndex, ScanCounterIsDeterministicBoundsDistancesAndSumsToBatch) {
   const Fixture f;
   fse::AcornIndex index = Build(f, 4);
@@ -183,7 +175,7 @@ TEST(AcornIndex, SaveLoadGivesIdenticalResults) {
                      db.data());
   EXPECT_EQ(a, b);
   EXPECT_EQ(da, db);
-  // Attribute count must match the index.
+
   EXPECT_THROW(fse::AcornIndex::Load(path, {1, 2, 3}), std::invalid_argument);
 }
 
@@ -194,4 +186,4 @@ TEST(AcornIndex, AddRejectsMoreVectorsThanAttributes) {
   EXPECT_THROW(index.Add(kN, f.base.data()), std::invalid_argument);
 }
 
-}  // namespace
+}

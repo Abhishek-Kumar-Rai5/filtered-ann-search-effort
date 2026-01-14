@@ -1,5 +1,4 @@
-"""Phase 1 figures: Recall@10 vs QPS and vs distance computations for the
-ACORN SIFT1M reproduction (cf. ACORN paper Fig. 7a / Table 3).
+"""Plot recall against QPS and distance computations for the Phase 1 ACORN runs.
 
 Usage:
   python python/plotting/phase1_recall_qps.py RUN_DIR --out FIG_DIR
@@ -16,8 +15,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 import pandas as pd  # noqa: E402
 
-# Default validated categorical palette, slots 1-2 (dataviz skill; checked
-# with validate_palette.js on the light surface: all checks pass).
 SERIES = {"acorn_gamma": ("#2a78d6", "ACORN-γ", "o"),
           "acorn_1": ("#eb6834", "ACORN-1", "s")}
 SURFACE = "#fcfcfb"
@@ -40,7 +37,6 @@ def main() -> None:
     ap.add_argument("run_dir", type=Path)
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
-    # One experiment directory: <run_dir>/<method>/{aggregate,timing_trials}.csv
     agg = pd.concat(pd.read_csv(args.run_dir / m / "aggregate.csv")
                     for m in SERIES)
     timing = pd.concat(pd.read_csv(args.run_dir / m / "timing_trials.csv")
