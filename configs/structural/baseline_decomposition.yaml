@@ -1,0 +1,10 @@
+# FINAL baseline: Phase 4 PRE / POST at s = 0.01 (random; clustered = C1000 r0).
+experiment_name: structural_final_baseline_decomposition
+manifest: results/structural/slice/manifest.yaml
+k: 10
+reach_dir: results/structural/baseline/reach
+methods:
+  prefilter: {sweep_dir: results/phase4/matrix/prefilter, reach: pre}
+  postfilter: {sweep_dir: results/phase4/matrix/postfilter, reach: postfilter}
+bootstrap: {seed: 20261800, resamples: 500, ci: 0.95}
+output_dir: results/structural/baseline/analysis

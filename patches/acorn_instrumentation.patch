@@ -1,0 +1,186 @@
+diff --git a/faiss/IndexACORN.cpp b/faiss/IndexACORN.cpp
+index 336a42a..4f4f569 100644
+--- a/faiss/IndexACORN.cpp
++++ b/faiss/IndexACORN.cpp
+@@ -70,6 +70,7 @@ using storage_idx_t = ACORN::storage_idx_t;
+ using NodeDistFarther = ACORN::NodeDistFarther;
+ 
+ ACORNStats acorn_stats;
++int64_t acorn_level0_seed = -1;  // fse: level0_seed instrumentation
+ 
+ /**************************************************************
+  * add / search blocks of descriptors
+@@ -312,6 +313,7 @@ void IndexACORN::search(
+     }
+     size_t n1 = 0, n2 = 0, n3 = 0, ndis = 0, nreorder = 0;
+     double candidates_loop = 0, neighbors_loop = 0, tuple_unwrap = 0, skips = 0, visits = 0; //added for profiling
++    size_t n_scanned = 0;  // fse: n_scanned instrumentation
+ 
+     idx_t check_period =
+             InterruptCallback::get_period_hint(acorn.max_level * d * efSearch);
+@@ -326,7 +328,7 @@ void IndexACORN::search(
+             DistanceComputer* dis = storage_distance_computer(storage);
+             ScopeDeleter1<DistanceComputer> del(dis);
+ 
+-#pragma omp for reduction(+ : n1, n2, n3, ndis, nreorder, candidates_loop)
++#pragma omp for reduction(+ : n1, n2, n3, ndis, nreorder, candidates_loop, n_scanned)  // fse: n_scanned instrumentation
+             for (idx_t i = i0; i < i1; i++) {
+                 idx_t* idxi = labels + i * k;
+                 float* simi = distances + i * k;
+@@ -350,6 +352,7 @@ void IndexACORN::search(
+                 tuple_unwrap += stats.tuple_unwrap;
+                 skips += stats.skips;
+                 visits += stats.visits;
++                n_scanned += stats.n_scanned;  // fse: n_scanned instrumentation
+                 maxheap_reorder(k, simi, idxi);
+                 
+             }
+@@ -364,7 +367,7 @@ void IndexACORN::search(
+         }
+     }
+ 
+-    acorn_stats.combine({n1, n2, n3, ndis, nreorder, candidates_loop, neighbors_loop, tuple_unwrap, skips, visits}); //added for profiling
++    acorn_stats.combine({n1, n2, n3, ndis, nreorder, candidates_loop, neighbors_loop, tuple_unwrap, skips, visits, n_scanned});  // fse: n_scanned instrumentation //added for profiling
+ }
+ 
+ // TODO figure out what do with this
+diff --git a/faiss/impl/ACORN.cpp b/faiss/impl/ACORN.cpp
+index e2c3da5..5c37fd2 100644
+--- a/faiss/impl/ACORN.cpp
++++ b/faiss/impl/ACORN.cpp
+@@ -860,7 +860,8 @@ int hybrid_greedy_update_nearest(
+         // std::string regex,
+         int level,
+         storage_idx_t& nearest,
+-        float& d_nearest) {
++        float& d_nearest,
++        size_t& n_scanned) {  // fse: n_scanned instrumentation
+     debug("%s\n", "reached"); 
+     // printf("hybrid_greedy_update_nearest called with parameters: filter: %d, op: %d, regex: %s, level: %d\n", filter, op, regex.c_str(), level);
+     int ndis = 0;
+@@ -882,6 +883,7 @@ int hybrid_greedy_update_nearest(
+             
+             if (v < 0)
+                 break;
++            n_scanned++;  // fse: n_scanned instrumentation
+                 
+             // note that this slows down search significantly but can be useful for debugging
+             // if (debugSearchFlag) {
+@@ -932,6 +934,7 @@ int hybrid_greedy_update_nearest(
+ 
+                     if (v2 < 0)
+                         break;
++                    n_scanned++;  // fse: n_scanned instrumentation
+ 
+ 
+                     // check filter pass
+@@ -1212,6 +1215,7 @@ int hybrid_search_from_candidates(
+     // debug_search("----hybrid_search_from_candidates called with filter: %d, k: %d\n", filter, k);
+     int nres = nres_in;
+     int ndis = 0;
++    size_t nscan = 0;  // fse: n_scanned instrumentation
+ 
+     // can be overridden by search params
+     bool do_dis_check = params ? params->check_relative_distance
+@@ -1281,6 +1285,7 @@ int hybrid_search_from_candidates(
+             if (v1 < 0) {
+                 break;
+             }
++            nscan++;  // fse: n_scanned instrumentation
+ 
+             // note that this slows down search performance significantly
+             // if (debugSearchFlag) {
+@@ -1341,6 +1346,7 @@ int hybrid_search_from_candidates(
+                         // continue;
+                         break;
+                     }
++                    nscan++;  // fse: n_scanned instrumentation
+ 
+                     // if (metadata2 == filter) {
+                     if (filter_map[v2]) {
+@@ -1403,6 +1409,7 @@ int hybrid_search_from_candidates(
+         }
+         stats.n3 += ndis;
+     }
++    stats.n_scanned += nscan;  // fse: n_scanned instrumentation
+ 
+ 
+     return nres;
+@@ -1522,6 +1529,7 @@ ACORNStats ACORN::hybrid_search(
+     if (entry_point == -1) {
+         return stats;
+     }
++    acorn_level0_seed = -1;  // fse: level0_seed instrumentation
+ 
+ 
+     if (upper_beam == 1) { // common branch
+@@ -1534,15 +1542,18 @@ ACORNStats ACORN::hybrid_search(
+         debug_search("-starting at ep: %d, d: %f, metadata: %d\n", nearest, d_nearest, metadata[nearest]);
+ 
+         int ndis_upper = 0;
++        size_t nscan_upper = 0;  // fse: n_scanned instrumentation
+         for (int level = max_level; level >= 1; level--) {
+             debug_search("-at level %d, searching for greedy nearest from current nearest: %d, dist: %f, metadata: %d\n", level, nearest, d_nearest, metadata[nearest]);
+-            ndis_upper += hybrid_greedy_update_nearest(*this, qdis, filter_map, level, nearest, d_nearest);
++            ndis_upper += hybrid_greedy_update_nearest(*this, qdis, filter_map, level, nearest, d_nearest, nscan_upper);  // fse: n_scanned instrumentation
+             // ndis_upper += hybrid_greedy_update_nearest(*this, qdis, filter, op, regex, level, nearest, d_nearest);
+             debug_search("-at level %d, new nearest: %d, d: %f, metadata: %d\n", level, nearest, d_nearest, metadata[nearest]);
+             
+ 
+         }
+         stats.n3 += ndis_upper;
++        stats.n_scanned += nscan_upper;  // fse: n_scanned instrumentation
++        acorn_level0_seed = nearest;  // fse: level0_seed instrumentation
+ 
+         int ef = std::max(efSearch, k);
+         if (search_bounded_queue) { // this is the most common branch
+diff --git a/faiss/impl/ACORN.h b/faiss/impl/ACORN.h
+index 0faf51a..645f63a 100644
+--- a/faiss/impl/ACORN.h
++++ b/faiss/impl/ACORN.h
+@@ -285,6 +285,9 @@ struct ACORNStats {
+     double skips;
+     double visits;
+ 
++    // neighbour-list entries read and filter-checked (hybrid search)
++    size_t n_scanned;  // fse: n_scanned instrumentation
++
+ 
+     ACORNStats(
+             size_t n1 = 0,
+@@ -296,8 +299,9 @@ struct ACORNStats {
+             double neighbors_loop = 0.0,
+             double tuple_unwrap = 0.0,
+             double skips = 0.0,
+-            double visits = 0.0)
+-            : n1(n1), n2(n2), n3(n3), ndis(ndis), nreorder(nreorder), candidates_loop(candidates_loop), neighbors_loop(neighbors_loop), tuple_unwrap(tuple_unwrap), skips(skips), visits(visits) {}
++            double visits = 0.0,
++            size_t n_scanned = 0)  // fse: n_scanned instrumentation
++            : n1(n1), n2(n2), n3(n3), ndis(ndis), nreorder(nreorder), candidates_loop(candidates_loop), neighbors_loop(neighbors_loop), tuple_unwrap(tuple_unwrap), skips(skips), visits(visits), n_scanned(n_scanned) {}  // fse: n_scanned instrumentation
+ 
+     void reset() {
+         n1 = n2 = n3 = 0;
+@@ -310,6 +314,7 @@ struct ACORNStats {
+         tuple_unwrap = 0.0;
+         skips = 0.0;
+         visits = 0.0;
++        n_scanned = 0;  // fse: n_scanned instrumentation
+     }
+ 
+     void combine(const ACORNStats& other) {
+@@ -325,10 +330,15 @@ struct ACORNStats {
+         tuple_unwrap += other.tuple_unwrap;
+         skips = other.skips;
+         visits = other.visits;
++        n_scanned += other.n_scanned;  // fse: n_scanned instrumentation
+     }
+ };
+ 
+ // global var that collects them all
+ FAISS_API extern ACORNStats acorn_stats;
+ 
++// level-0 starting node of the most recent hybrid_search (-1 = none);
++// process-wide, like acorn_stats (single-threaded use per query)
++FAISS_API extern int64_t acorn_level0_seed;  // fse: level0_seed instrumentation
++
+ } // namespace faiss

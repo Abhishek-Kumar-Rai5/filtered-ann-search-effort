@@ -1,0 +1,15 @@
+# FINAL baseline: POST reachability (unfiltered HNSW) on the Phase 4 s = 0.01 conditions.
+experiment_name: structural_final_baseline_reach
+dataset:
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
+manifest: results/structural/slice/manifest.yaml
+k: 10
+budgets: [10, 20, 40, 80, 160, 320, 640, 1280, 2560]
+graphs:
+  postfilter:
+    kind: hnsw
+    index_path: data/cache/phase4/hnsw_post_m32_efc40_seed42.bin
+    index_hash: "2545153aadf3eee8"
+    sweep_dir: results/phase4/matrix/postfilter
+output_dir: results/structural/baseline/reach

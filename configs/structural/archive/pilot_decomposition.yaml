@@ -1,0 +1,10 @@
+# Fragmentation pilot: L = U + N for ACORN-γ and ACORN-1 at s = 0.01.
+experiment_name: structural_pilot_decomposition
+manifest: results/structural/pilot/conditions/manifest.yaml
+k: 10
+reach_dir: results/structural/pilot/reach
+methods:
+  acorn_gamma: {sweep_dir: results/structural/pilot/matrix_gamma/acorn, reach: acorn_gamma}
+  acorn_1: {sweep_dir: results/structural/pilot/matrix_acorn1/acorn, reach: acorn_1}
+bootstrap: {seed: 20261800, resamples: 2000, ci: 0.95}
+output_dir: results/structural/pilot/analysis

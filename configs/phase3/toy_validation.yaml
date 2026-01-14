@@ -1,0 +1,43 @@
+# Phase 3 checkpoint: synthetic filter conditions + filtered ground truth on
+# a verifiable toy case (design doc section 21; docs/phase3_filter_generator.md).
+experiment_name: phase3_toy_validation
+
+dataset:                     # SIFT1M prefix (same toy case as Phase 2)
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
+  max_base: 20000
+  max_queries: 200
+
+search:
+  k: 10
+
+selectivity:                 # design section 10: 6 log-spaced levels, 1%-100%
+  min: 0.01
+  max: 1.0
+  levels: 6
+
+correlations: [random, clustered]
+
+generator:
+  random_seed: 20261010      # rank permutation (random condition)
+  clustered:
+    num_clusters: 100        # ~200 vectors per cluster at N = 20,000
+    kmeans_iterations: 25
+    kmeans_seed: 20261011
+    max_points_per_centroid: 256
+    order_seed: 20261012     # cluster order and within-cluster order
+
+validation:                  # post-hoc structure checks only
+  local_density_k: [10, 100]
+  homophily_sample: 1000
+  homophily_k: 10
+  homophily_seed: 20261013
+  # Check-2 correction (docs/phase3_filter_generator.md section 9):
+  null_draws: 5000           # independence null: extra random-condition draws
+  null_seed: 20261100        # validation-only seeds null_seed + r
+  alpha_family: 0.01         # Bonferroni over the clustered tests
+  kappa_min: 0.20            # Landis-Koch "fair" floor for kappa_h
+
+paths:
+  output_dir: results/phase3
+  cache_dir: data/cache/phase3

@@ -1,0 +1,35 @@
+# Phase 2 checkpoint: pre-filter and post-filter baselines vs exact
+# brute-force filtered ground truth on a small case (design doc section 21).
+# The three conditions are correctness cases only -- NOT the Phase 3/4
+# selectivity x correlation grid (no correlation control, toy scale).
+experiment_name: phase2_toy_validation
+
+dataset:                     # small real-data case: SIFT1M prefix
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
+  max_base: 20000
+  max_queries: 200
+
+conditions:                  # uniform int attribute in [1, values], equals(y)
+  - {name: unfiltered_s1, values: 1, base_seed: 20261004, query_seed: 20261005}
+  - {name: s_0.083, values: 12, base_seed: 20261006, query_seed: 20261007}
+  - {name: s_0.01, values: 100, base_seed: 20261008, query_seed: 20261009}
+
+search:
+  k: 10
+
+postfilter:
+  hnsw_m: 32                 # same M as ACORN; efc 40 = the ACORN paper's
+  hnsw_ef_construction: 40   # HNSW post-filter setting (provisional for Phase 4)
+  hnsw_seed: 42
+  build_threads: 1           # single-threaded: bit-reproducible graph
+  ef_search: [10, 40, 160, 640]
+  overfetch_factor: 1.0      # round-1 fetch = ceil(1.0 * k / s)
+  growth_factor: 2.0         # each refetch doubles the fetch
+  max_rounds: 10
+
+checks:
+  parallel_threads: 8        # serial vs parallel results/effort must match
+
+paths:
+  output_dir: results/phase2

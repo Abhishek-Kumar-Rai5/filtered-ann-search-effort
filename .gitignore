@@ -1,0 +1,35 @@
+build/
+build-*/
+.cache/
+compile_commands.json
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Data, indexes, attribute and ground-truth caches (regenerable; ~7 GB).
+data/
+
+# Results: raw per-query outputs are large and regenerable from the configs.
+# Tracked: the final structural report and the small summary / provenance
+# files it is built from (python/analysis/structural_report.py).
+/results/*
+!/results/structural/
+/results/structural/*
+!/results/structural/report/
+!/results/structural/baseline/
+!/results/structural/slice/
+!/results/structural/pilot/
+/results/structural/pilot/*
+!/results/structural/pilot/decision/
+# ... but never raw outputs, reachability dumps, sweeps, logs or run scripts
+/results/structural/**/logs/
+/results/structural/**/matrix*/
+/results/structural/**/*_reach.csv
+/results/structural/**/*.csv.gz
+/results/structural/**/*.bin
+/results/structural/**/per_query.csv
+/results/structural/**/run.sh
+
+# Agent workflow instructions (local only)
+CLAUDE.md

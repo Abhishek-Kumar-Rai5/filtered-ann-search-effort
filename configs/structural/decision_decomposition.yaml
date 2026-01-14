@@ -1,0 +1,10 @@
+# Decision experiment: L = U + N on realization 0 of C100/C1000/random.
+experiment_name: structural_decision_decomposition
+manifest: results/structural/pilot/decision/manifest_r0.yaml
+k: 10
+reach_dir: results/structural/pilot/decision/reach
+methods:
+  acorn_gamma: {sweep_dir: results/structural/pilot/decision/matrix_gamma/acorn, reach: acorn_gamma}
+  acorn_1: {sweep_dir: results/structural/pilot/decision/matrix_acorn1/acorn, reach: acorn_1}
+bootstrap: {seed: 20261800, resamples: 2000, ci: 0.95}
+output_dir: results/structural/pilot/decision/analysis_r0

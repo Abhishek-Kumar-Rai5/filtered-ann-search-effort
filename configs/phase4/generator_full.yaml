@@ -1,0 +1,44 @@
+# Phase 4 step 2: full-scale generator validation G1-G8 (docs/phase4_matrix.md §3.1).
+# Frozen generator with C = 1000 (selected in §6).
+experiment_name: phase4_generator_full
+mode: validation
+
+dataset:
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
+  max_base: 0          # all 1,000,000
+  max_queries: 0       # all 10,000
+
+search:
+  k: 10
+
+ground_truth:
+  k: 11               # depth 11: tie detection at rank 10
+
+selectivity: {min: 0.01, max: 1.0, levels: 6}
+correlations: [random, clustered]
+
+generator:             # Phase 3 seeds, unchanged
+  random_seed: 20261010
+  clustered:
+    num_clusters: 1000   # frozen (docs/phase4_matrix.md §6)
+    kmeans_iterations: 25
+    kmeans_seed: 20261011
+    max_points_per_centroid: 256
+    order_seed: 20261012
+
+validation:
+  local_density_k: [10, 100]
+  homophily_mode: sampled      # exact N x N infeasible at N = 1e6
+  homophily_sample: 20000
+  homophily_k: 10
+  homophily_seed: 20261013
+  null_draws: 5000
+  null_seed: 20261100
+  alpha_family: 0.01
+  kappa_min: 0.20
+  gt_recompute_check: false    # determinism via two separate runs (G8)
+
+paths:
+  output_dir: results/phase4
+  cache_dir: data/cache/phase4

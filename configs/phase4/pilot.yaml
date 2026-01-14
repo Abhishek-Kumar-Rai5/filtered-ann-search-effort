@@ -1,0 +1,49 @@
+# Phase 4 pilot (section 4 step 4): implementation/operational check only.
+# Same frozen settings; first 1,000 queries; budgets 10, 160, 2560.
+experiment_name: phase4_pilot
+
+dataset:
+  base: data/sift/sift_base.fvecs      # all 1,000,000
+  queries: data/sift/sift_query.fvecs  # all 10,000
+
+search:
+  k: 10
+  gt_k: 11                 # ground-truth depth (tie detection)
+
+selectivity: {min: 0.01, max: 1.0, levels: 6}
+
+generator:                 # frozen Phase 3 generator, C = 1000 (section 6);
+  cache_dir: data/cache/phase4   # attributes and ground truth from the
+  attribute_hashes:              # full-scale validation run (verified on load)
+    random: "d9ee351d3dd6101b"
+    clustered: "1244cce0305ac7b6"
+
+budgets: [10, 160, 2560]
+
+methods:
+  postfilter:
+    m: 32
+    ef_construction: 40
+    seed: 42
+    build_threads: 1       # bit-reproducible graph
+    overfetch_factor: 1.0  # round-1 fetch ceil(k/s)
+    growth_factor: 2.0
+    max_rounds: 10
+    replay_queries: 200    # V5 replay audit per (condition, budget)
+    replay_seed: 20261301
+  acorn:
+    gamma: 100             # 1/s_min (ACORN paper rule)
+    m: 32
+    m_beta: 64
+    build_threads: 16
+    audit_base: 20000      # V5 +1 audit prefix
+    audit_queries: 50
+
+query_subset: {count: 1000, seed: 0, first_n: true}
+sweep_threads: 16
+
+timing: {queries: 500, seed: 20261200, repeats: 3}
+
+paths:
+  index_dir: data/cache/phase4
+  output_dir: results/phase4/pilot

@@ -1,0 +1,13 @@
+method,condition,level,realization,semantics,passing_clusters,distinct_seeds,seeds_failing_filter,nodes,edges,sccs,largest_scc,wccs,largest_wcc
+acorn_1,clustered_s0.0100,C1000,0,graph,10,593,0,10000,191712,273,5260,128,8402
+acorn_1,clustered_s0.0100,C1000,0,sem,10,593,0,10000,3151261,3,9998,1,10000
+acorn_1,clustered_s0.0100,C1000,0,cap,10,593,0,10000,604980,13,9988,1,10000
+acorn_gamma,clustered_s0.0100,C1000,0,graph,10,30,0,10000,289514,48,5314,6,6812
+acorn_gamma,clustered_s0.0100,C1000,0,sem,10,30,0,10000,1674908,3,9998,1,10000
+acorn_gamma,clustered_s0.0100,C1000,0,cap,10,30,0,10000,480779,6,9994,1,10000
+acorn_1,random_s0.0100,random,0,graph,0,216,0,10000,4998,8189,18,6929,133
+acorn_1,random_s0.0100,random,0,sem,0,216,0,10000,203187,18,9983,1,10000
+acorn_1,random_s0.0100,random,0,cap,0,216,0,10000,200423,18,9983,1,10000
+acorn_gamma,random_s0.0100,random,0,graph,0,30,0,10000,8375,7261,20,4721,1215
+acorn_gamma,random_s0.0100,random,0,sem,0,30,0,10000,106457,346,9645,7,9994
+acorn_gamma,random_s0.0100,random,0,cap,0,30,0,10000,103198,351,9640,7,9994

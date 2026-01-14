@@ -1,0 +1,13 @@
+# Final study decomposition; BLOCK_* filled per selectivity block.
+# Structural validation experiment: L = U + N decomposition and V-S checks.
+experiment_name: structural_final_decomposition
+manifest: BLOCK_MANIFEST
+k: 10
+reach_dir: BLOCK_REACH
+methods:                      # sweep_dir = <matrix>/<method>; reach = fse_reach graph
+  prefilter: {sweep_dir: results/structural/final/matrix/prefilter, reach: pre}
+  postfilter: {sweep_dir: results/structural/final/matrix/postfilter, reach: postfilter}
+  acorn_gamma: {sweep_dir: results/structural/final/matrix/acorn, reach: acorn_gamma}
+  acorn_1: {sweep_dir: results/structural/final/matrix_acorn1/acorn, reach: acorn_1}
+bootstrap: {seed: 20261800, resamples: 500, ci: 0.95}
+output_dir: BLOCK_OUT

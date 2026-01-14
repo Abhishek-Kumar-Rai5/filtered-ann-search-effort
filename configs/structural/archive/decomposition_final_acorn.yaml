@@ -1,0 +1,11 @@
+# FINAL run: s = 0.01, C100/C1000/C10000/random x 5 realizations, ACORN-1 and ACORN-γ.
+# Structural validation experiment: L = U + N decomposition and V-S checks.
+experiment_name: structural_final_decomposition
+manifest: results/structural/final/conditions/manifest_s0.0100.yaml
+k: 10
+reach_dir: results/structural/final/reach_s0.0100
+methods:                      # sweep_dir = <matrix>/<method>; reach = fse_reach graph
+  acorn_gamma: {sweep_dir: results/structural/final/matrix/acorn, reach: acorn_gamma}
+  acorn_1: {sweep_dir: results/structural/final/matrix_acorn1/acorn, reach: acorn_1}
+bootstrap: {seed: 20261800, resamples: 500, ci: 0.95}
+output_dir: results/structural/final/analysis_s0.0100

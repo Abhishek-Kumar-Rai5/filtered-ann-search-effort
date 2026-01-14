@@ -1,0 +1,25 @@
+{
+  "validation": {
+    "decision_r0": {
+      "rows": 540000,
+      "identity_violations": 0,
+      "found_targets_unreachable": 0,
+      "recall_mismatch": 0,
+      "all_pass": true
+    },
+    "baseline_pre_post": {
+      "rows": 200000,
+      "identity_violations": 0,
+      "found_targets_unreachable": 0,
+      "recall_mismatch": 0,
+      "all_pass": true
+    },
+    "slice": {
+      "rows": 360000,
+      "identity_violations": 0,
+      "found_targets_unreachable": 0,
+      "recall_mismatch": 0,
+      "all_pass": true
+    }
+  }
+}

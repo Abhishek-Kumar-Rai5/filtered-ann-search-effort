@@ -1,0 +1,46 @@
+# Smoke test: whole Phase 1 pipeline on a 20K-vector subset, < 1 min.
+# Every value below is fixed in docs/phase1_acorn_repro.md (pre-registered).
+experiment_name: phase1_smoke
+
+dataset:
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
+  official_groundtruth: data/sift/sift_groundtruth.ivecs
+  max_base: 20000
+  max_queries: 200
+
+attributes:          # paper 7.1.1: random int 1..12, equals(y)
+  min: 1
+  max: 12
+  base_seed: 20261002
+  query_seed: 20261003
+  draw_label: A
+
+index:
+  build_label: smoke
+  reuse_cached: false        # fresh build
+  build_threads: 16
+  methods:                   # efConstruction = ACORN default M*gamma
+    - {name: acorn_gamma, gamma: 12, m: 32, m_beta: 64}
+    - {name: acorn_1, gamma: 1, m: 32, m_beta: 64}
+
+search:
+  k: 10
+  dense_efs: {from: 10, to: 30, step: 5}   # Table-3 crossing
+  paper_efs: {from: 10, to: 800, step: 50}  # paper curve grid: 10..760
+
+timing:
+  threads: 16
+  warmup_trials: 1
+  trials: 2
+
+checks:
+  official_gt_check: true
+  faiss_gt_crosscheck_queries: 20
+  determinism_efs: [10, 60, 760]
+  counter_check_efs: [10, 110, 760]
+  reload_check: true
+
+paths:
+  cache_dir: data/cache/smoke
+  output_dir: results/smoke

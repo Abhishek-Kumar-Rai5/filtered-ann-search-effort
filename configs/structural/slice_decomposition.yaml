@@ -1,0 +1,10 @@
+# Vertical slice: L = U + N for ACORN-γ (Phase 4 sweeps) and ACORN-1 at s = 0.01.
+experiment_name: structural_slice_decomposition
+manifest: results/structural/slice/manifest.yaml
+k: 10
+reach_dir: results/structural/slice/reach
+methods:
+  acorn_gamma: {sweep_dir: results/phase4/matrix/acorn, reach: acorn_gamma}
+  acorn_1: {sweep_dir: results/structural/slice/matrix_acorn1/acorn, reach: acorn_1}
+bootstrap: {seed: 20261800, resamples: 2000, ci: 0.95}
+output_dir: results/structural/slice/analysis

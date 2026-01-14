@@ -1,0 +1,30 @@
+# Fragmentation pilot (s = 0.01, 5 realizations): conditions (docs/structural_design.md §5).
+# Fixed k-means partition per C (one kmeans_seed per level); realizations
+# differ only in the cluster-order / permutation seed. Realization 0 reuses
+# the Phase 4 seeds, so C1000_r0 and random_r0 must reproduce the Phase 4
+# attributes (checked).
+experiment_name: structural_pilot_conditions
+
+dataset:
+  base: data/sift/sift_base.fvecs
+  queries: data/sift/sift_query.fvecs
+
+ground_truth: {k: 11}          # depth 11: tie detection at rank 10 (Phase 4)
+selectivities: [0.01]
+
+fragmentation:
+  kmeans: {iterations: 25, max_points_per_centroid: 256}   # Phase 3/4
+  levels:
+    - {name: C100, num_clusters: 100, kmeans_seed: 20261011}
+    - {name: C1000, num_clusters: 1000, kmeans_seed: 20261011}
+    - {name: C10000, num_clusters: 10000, kmeans_seed: 20261011}
+    - {name: random, random: true}
+  order_seeds: [20261012, 20261701, 20261703, 20261704, 20261705]   # r0..r4
+  random_seeds: [20261010, 20261702, 20261706, 20261707, 20261708]  # r0..r4
+  expected_attribute_hashes:           # Phase 4 reproduction (V-S5)
+    C1000_r0: "1244cce0305ac7b6"
+    random_r0: "d9ee351d3dd6101b"
+
+paths:
+  cache_dir: data/cache/structural_pilot
+  output_dir: results/structural/pilot/conditions

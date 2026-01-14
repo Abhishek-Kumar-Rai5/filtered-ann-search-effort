@@ -1,0 +1,11 @@
+method,realization,passing_clusters,U_sem
+acorn_1,0,2,0.00537
+acorn_1,1,2,0.10795
+acorn_1,2,1,0.00067
+acorn_1,3,1,0.0
+acorn_1,4,2,0.02171
+acorn_gamma,0,2,1e-05
+acorn_gamma,1,2,0.0
+acorn_gamma,2,1,0.0
+acorn_gamma,3,1,0.0
+acorn_gamma,4,2,0.0

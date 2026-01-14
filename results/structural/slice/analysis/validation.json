@@ -1,0 +1,35 @@
+{
+  "recall_mismatch": 0,
+  "identity_violations": 0,
+  "found_targets_unreachable": 0,
+  "graph_not_subset_sem": 0,
+  "cap_not_subset_sem": 0,
+  "seed_inconsistent": 0,
+  "pre_nonzero_U_or_N": 0,
+  "gt_query_hash": [
+    "1581622a88a15dec"
+  ],
+  "rows": 360000,
+  "soundness": {
+    "acorn_1": {
+      "checked": 1800000,
+      "violations": 0,
+      "index_file_hash": "d228d82803cf00cb"
+    },
+    "acorn_gamma": {
+      "checked": 1800000,
+      "violations": 0,
+      "index_file_hash": "20b0dacd17007dd4"
+    }
+  },
+  "checks": {
+    "V-S1_identity": true,
+    "V-S2_soundness": true,
+    "V-S3_pre_zero": true,
+    "V-S4_seed_consistent": true,
+    "recall_consistent": true,
+    "subset_graph_cap_in_sem": true,
+    "single_query_hash": true
+  },
+  "all_pass": true
+}
